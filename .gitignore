@@ -68,3 +68,7 @@ src/frontend/.cline/
 *.log
 *.err
 
+
+# duplicate of planInicial.md
+planInicial.txt
+
