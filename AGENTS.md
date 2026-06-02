@@ -18,19 +18,48 @@
 - `src/docker/` — Dockerfiles (backend, frontend), nginx.conf, docker-compose.yml
 - `.opencode/` — OpenSpec skills and config
 
+## Quick Start (Development)
+
+### Prerequisites
+- Docker (for PostgreSQL 18)
+- .NET 10 SDK
+- Node.js 22+
+
+### Step 1: Start PostgreSQL
+```bash
+docker run -d --name mvp-postgres ^
+  -e POSTGRES_DB=mvp-usuarios-db ^
+  -e POSTGRES_USER=mvp-usuarios-db ^
+  -e POSTGRES_PASSWORD=mvp-usuarios-dev-2024 ^
+  -p 5432:5432 ^
+  postgres:18-alpine
+```
+
+### Step 2: Run Backend
+```bash
+# Terminal 1 — Backend (http://localhost:5011)
+dotnet run --project src/backend/UserManagement.WebApi --launch-profile http
+```
+- API: `http://localhost:5011/api/...`
+- Scalar UI (docs): `http://localhost:5011/scalar/v1`
+- Admin login: `admin` / `admin` (SuperAdmin)
+- DB and seed data are auto-applied on startup
+
+### Step 3: Run Frontend
+```bash
+# Terminal 2 — Frontend (http://localhost:5173)
+cd src/frontend && npm run dev
+```
+- Frontend proxies `/api` to backend at `http://localhost:5011`
+- Login and navigate to Dashboard, Users, Roles, Permissions, etc.
+
 ## Key Commands
 ```bash
 # Build .NET backend
 dotnet build UserManagement.slnx
 
-# Run backend with watch
-dotnet watch run --project src/backend/UserManagement.WebApi
-
 # Build frontend
 cd src/frontend && npm run build
-
-# Run frontend dev
-cd src/frontend && npm run dev
 
 # Run all tests
 dotnet test UserManagement.slnx

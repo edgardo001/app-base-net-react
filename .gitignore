@@ -63,3 +63,8 @@ src/frontend/.cline/
 *.secret
 *.key
 !docker/secrets/README.md
+
+# logs
+*.log
+*.err
+

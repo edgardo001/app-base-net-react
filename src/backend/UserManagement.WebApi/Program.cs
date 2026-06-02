@@ -2,6 +2,7 @@ using Serilog;
 using Scalar.AspNetCore;
 using UserManagement.Application;
 using UserManagement.Infrastructure;
+using UserManagement.Infrastructure.Services;
 using UserManagement.WebApi.Middleware;
 
 // WebApi referencia Application e Infrastructure directamente (no solo
@@ -44,6 +45,8 @@ try
     });
 
     var app = builder.Build();
+
+    await DatabaseSeeder.SeedAsync(app.Services);
 
     app.UseSerilogRequestLogging();
     app.UseMiddleware<ExceptionHandlingMiddleware>();

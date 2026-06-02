@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using UserManagement.Application.Common.Interfaces;
 using UserManagement.Domain.Entities;
 using UserManagement.Infrastructure.Persistence;
 
@@ -13,6 +14,7 @@ public static class DatabaseSeeder
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<AppDbContext>>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasherService>();
 
         await context.Database.MigrateAsync();
 
@@ -103,7 +105,7 @@ public static class DatabaseSeeder
             "admin",
             "Admin",
             "Usuario",
-            "$argon2id$v=19$m=65536,t=3,p=1$...", // Will be set via seeder logic
+            hasher.HashPassword("admin"),
             null);
 
         adminUser.ConfirmEmail();

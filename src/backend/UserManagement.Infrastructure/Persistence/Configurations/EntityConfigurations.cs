@@ -19,7 +19,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.AvatarPath).HasMaxLength(500);
         builder.Property(u => u.EmailConfirmationToken).HasMaxLength(256);
-        builder.Property(u => u.ConcurrencyToken).IsRowVersion();
+        builder.Property(u => u.ConcurrencyToken).IsConcurrencyToken();
 
         builder.HasIndex(u => u.NormalizedEmail).IsUnique().HasDatabaseName("IX_Users_NormalizedEmail");
         builder.HasIndex(u => u.Email).IsUnique().HasDatabaseName("IX_Users_Email");
@@ -39,7 +39,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.Property(r => r.Name).HasMaxLength(100).IsRequired();
         builder.Property(r => r.NormalizedName).HasMaxLength(100).IsRequired();
         builder.Property(r => r.Description).HasMaxLength(500);
-        builder.Property(r => r.ConcurrencyToken).IsRowVersion();
+        builder.Property(r => r.ConcurrencyToken).IsConcurrencyToken();
 
         builder.HasIndex(r => r.NormalizedName).IsUnique().HasDatabaseName("IX_Roles_NormalizedName");
     }
@@ -113,7 +113,7 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.Property(rt => rt.DeviceInfo).HasMaxLength(500);
         builder.Property(rt => rt.IpAddress).HasMaxLength(50);
         builder.Property(rt => rt.ReplacedByTokenHash).HasMaxLength(256);
-        builder.Property(rt => rt.ConcurrencyToken).IsRowVersion();
+        builder.Property(rt => rt.ConcurrencyToken).IsConcurrencyToken();
 
         builder.HasIndex(rt => rt.JwtId).IsUnique().HasDatabaseName("IX_RefreshTokens_JwtId");
         builder.HasIndex(rt => rt.TokenHash).HasDatabaseName("IX_RefreshTokens_TokenHash");
