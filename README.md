@@ -106,8 +106,8 @@ El archivo `src/docker/docker-compose.yml` levanta:
 4. **Frontend** — React SPA servido por Nginx
 
 Dominios por defecto (configurables en `.env`):
-- Backend: `mvp-usuarios-back.example.com`
-- Frontend: `mvp-usuarios-front.example.com`
+- Backend: (configurar dominio en producción)
+- Frontend: (configurar dominio en producción)
 
 ## Seed Data
 
