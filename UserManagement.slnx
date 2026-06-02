@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/backend/">
+    <Project Path="src/backend/UserManagement.Application/UserManagement.Application.csproj" />
+    <Project Path="src/backend/UserManagement.Domain/UserManagement.Domain.csproj" />
+    <Project Path="src/backend/UserManagement.Infrastructure/UserManagement.Infrastructure.csproj" />
+    <Project Path="src/backend/UserManagement.WebApi/UserManagement.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/src/frontend/" />
+</Solution>

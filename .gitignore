@@ -1,0 +1,65 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.tmp
+.vs/
+*.DotSettings
+*.userprefs
+packages/
+*.nupkg
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Storage
+storage/
+uploads/
+avatars/
+
+# AI assistant configs
+.agent/
+.claude/
+.cline/
+.clinerules/
+.codex/
+.continue/
+.gemini/
+.kilocode/
+.pi/
+.roo/
+# also match at src/frontend if any appear there
+src/frontend/.agent/
+src/frontend/.claude/
+src/frontend/.cline/
+
+# Secrets
+*.secret
+*.key
+!docker/secrets/README.md

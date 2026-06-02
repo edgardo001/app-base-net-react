@@ -1,0 +1,108 @@
+# =============================================================================
+# User Management Platform — Docker Compose
+# =============================================================================
+# Uso: docker compose -f src/docker/docker-compose.yml up -d
+#
+# Traefik maneja TLS automaticamente via Let's Encrypt.
+# Los dominios se configuran via environment variables en .env.
+# =============================================================================
+
+services:
+  # --- Reverse Proxy con TLS automatico ---
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Dashboard (opcional, desactivar en produccion)
+      - "--api.dashboard=false"
+    ports:
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik-letsencrypt:/letsencrypt"
+    networks:
+      - mvp-network
+    restart: unless-stopped
+
+  # --- Base de datos PostgreSQL 18 ---
+  postgres:
+    image: postgres:18-alpine
+    container_name: mvp-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mvp-usuarios-db}
+      POSTGRES_USER: ${POSTGRES_USER:-mvp-usuarios-db}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Debe definir POSTGRES_PASSWORD en .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mvp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mvp-usuarios-db} -d ${POSTGRES_DB:-mvp-usuarios-db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # --- Backend (.NET 10 Web API) ---
+  backend:
+    build:
+      context: ../../
+      dockerfile: src/docker/Dockerfile.backend
+    container_name: mvp-backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PostgreSQL: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mvp-usuarios-db};Username=${POSTGRES_USER:-mvp-usuarios-db};Password=${POSTGRES_PASSWORD:?}"
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?Debe definir JWT_SECRET_KEY en .env}
+      Jwt__Issuer: ${JWT_ISSUER:-mvp-usuarios}
+      Jwt__Audience: ${JWT_AUDIENCE:-mvp-usuarios-api}
+      Captcha__SiteKey: ${CAPTCHA_SITE_KEY:-}
+      Captcha__SecretKey: ${CAPTCHA_SECRET_KEY:-}
+      Email__Smtp__Host: ${SMTP_HOST:-}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Smtp__Password: ${SMTP_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mvp-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN:-mvp-usuarios-back.example.com}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+    restart: unless-stopped
+
+  # --- Frontend (React + Vite + Nginx) ---
+  frontend:
+    build:
+      context: ../../
+      dockerfile: src/docker/Dockerfile.frontend
+    container_name: mvp-frontend
+    depends_on:
+      - backend
+    networks:
+      - mvp-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${FRONTEND_DOMAIN:-mvp-usuarios-front.example.com}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  traefik-letsencrypt:
+
+networks:
+  mvp-network:
+    driver: bridge
