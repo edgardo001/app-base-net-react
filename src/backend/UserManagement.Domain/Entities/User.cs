@@ -96,6 +96,11 @@ public sealed class User : BaseEntity
         EmailConfirmationTokenExpires = null;
     }
 
+    public void ForcePasswordChange()
+    {
+        LastPasswordChangeAt = null;
+    }
+
     public void SetEmailConfirmationToken(string token, DateTime expires)
     {
         EmailConfirmationToken = token;

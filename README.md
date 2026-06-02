@@ -114,4 +114,4 @@ Dominios por defecto (configurables en `.env`):
 Al iniciar por primera vez, el seeder crea:
 - **22 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil
 - **5 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c
-- **Usuario admin**: `admin` / `admin` (SuperAdmin)
+- **Usuario admin**: `admin` / `admin` (SuperAdmin — se exige cambiar contraseña en primer ingreso)

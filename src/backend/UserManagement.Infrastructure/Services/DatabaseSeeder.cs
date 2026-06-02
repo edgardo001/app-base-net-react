@@ -109,6 +109,7 @@ public static class DatabaseSeeder
             null);
 
         adminUser.ConfirmEmail();
+        adminUser.ForcePasswordChange();
         context.Users.Add(adminUser);
         await context.SaveChangesAsync();
 

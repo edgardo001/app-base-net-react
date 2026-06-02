@@ -100,7 +100,7 @@ User ──────┐  ┌── Role
 
 ### Admin User
 - Email: `admin`
-- Password: `admin` (hashed with Argon2id)
+- Password: `admin` (se exige cambiar en primer ingreso)
 - Role: SuperAdmin
 
 ### Default Roles

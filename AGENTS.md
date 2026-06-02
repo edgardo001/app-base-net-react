@@ -42,7 +42,7 @@ dotnet run --project src/backend/UserManagement.WebApi --launch-profile http
 ```
 - API: `http://localhost:5011/api/...`
 - Scalar UI (docs): `http://localhost:5011/scalar/v1`
-- Admin login: `admin` / `admin` (SuperAdmin)
+- Admin login: `admin` / `admin` (SuperAdmin — se exige cambiar contraseña en primer ingreso)
 - DB and seed data are auto-applied on startup
 
 ### Step 3: Run Frontend

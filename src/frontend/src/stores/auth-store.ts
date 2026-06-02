@@ -13,7 +13,8 @@ interface AuthState {
   user: User | null
   permissions: string[]
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
+  passwordExpired: boolean
+  login: (email: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
 }
@@ -22,13 +23,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   permissions: [],
   isAuthenticated: !!localStorage.getItem('accessToken'),
+  passwordExpired: false,
 
   login: async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password })
-    const { accessToken, refreshToken, user: u, permissions: perms } = data.data
+    const { accessToken, refreshToken, user: u, permissions: perms, passwordExpired } = data.data
     localStorage.setItem('accessToken', accessToken)
     localStorage.setItem('refreshToken', refreshToken)
-    set({ user: u, permissions: perms, isAuthenticated: true })
+    set({ user: u, permissions: perms, isAuthenticated: true, passwordExpired: !!passwordExpired })
+    return !!passwordExpired
   },
 
   logout: async () => {
@@ -53,8 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = data.data
       set({ user, isAuthenticated: true })
     } catch {
-      localStorage.clear()
-      set({ user: null, isAuthenticated: false })
+      set({ isAuthenticated: false })
     }
   },
 }))
