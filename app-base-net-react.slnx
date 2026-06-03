@@ -5,10 +5,8 @@
     <Project Path="src/backend/AppBaseNetReact.Domain/AppBaseNetReact.Domain.csproj" />
     <Project Path="src/backend/AppBaseNetReact.Infrastructure/AppBaseNetReact.Infrastructure.csproj" />
     <Project Path="src/backend/AppBaseNetReact.WebApi/AppBaseNetReact.WebApi.csproj" />
+    <Project Path="src/backend/AppBaseNetReact.Application.Tests/AppBaseNetReact.Application.Tests.csproj" />
+    <Project Path="src/backend/AppBaseNetReact.WebApi.Tests/AppBaseNetReact.WebApi.Tests.csproj" />
   </Folder>
   <Folder Name="/src/frontend/" />
-  <Folder Name="/tests/">
-    <Project Path="tests/AppBaseNetReact.Application.Tests/AppBaseNetReact.Application.Tests.csproj" />
-    <Project Path="tests/AppBaseNetReact.WebApi.Tests/AppBaseNetReact.WebApi.Tests.csproj" />
-  </Folder>
 </Solution>

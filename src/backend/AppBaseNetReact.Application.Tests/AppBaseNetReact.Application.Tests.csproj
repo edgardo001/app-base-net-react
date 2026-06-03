@@ -21,9 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\backend\AppBaseNetReact.WebApi\AppBaseNetReact.WebApi.csproj" />
-    <ProjectReference Include="..\..\src\backend\AppBaseNetReact.Application\AppBaseNetReact.Application.csproj" />
-    <ProjectReference Include="..\..\src\backend\AppBaseNetReact.Domain\AppBaseNetReact.Domain.csproj" />
+    <ProjectReference Include="..\AppBaseNetReact.Application\AppBaseNetReact.Application.csproj" />
+    <ProjectReference Include="..\AppBaseNetReact.Domain\AppBaseNetReact.Domain.csproj" />
+    <ProjectReference Include="..\AppBaseNetReact.Infrastructure\AppBaseNetReact.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

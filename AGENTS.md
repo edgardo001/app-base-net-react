@@ -16,7 +16,7 @@ User management platform with RBAC. .NET 10 (hexagonal/CQRS), React 19 + shadcn/
   - `components/auth/` — Auth guards
   - `pages/` — Login, dashboard, users, roles, permissions
 - `src/docker/` — Dockerfiles, nginx.conf, docker-compose.yml
-- `tests/` — xUnit + Moq + FluentAssertions, mirror source structure
+- `src/backend/` — xUnit + Moq + FluentAssertions tests inside backend
 - `.opencode/` — OpenSpec skills and config
 
 ## Quick Start
@@ -72,7 +72,7 @@ dotnet ef database update -p src/backend/AppBaseNetReact.Infrastructure -s src/b
 ## Conventions
 - Frontend: kebab-case for files/folders, PascalCase for C# classes/files
 - All API responses use `ApiResponse<T>` wrapper
-- Tests mirror source: `tests/AppBaseNetReact.*.Tests/`
+- Tests mirror source: `src/backend/AppBaseNetReact.*.Tests/`
 - Use `@theme` for Tailwind tokens (OKLCH), dark/light mode via CSS variables
 - Form validation: FluentValidation (backend) + React Hook Form + Zod (frontend)
 - Security headers middleware: CSP, X-Frame-Options, etc.
@@ -100,7 +100,7 @@ dotnet ef database update -p src/backend/AppBaseNetReact.Infrastructure -s src/b
 ### 🧪 QA
 - **Focus:** Test coverage, edge cases, regression prevention. Unit tests (xUnit+Moq+FluentAssertions), integration tests with Testcontainers (future), Vitest+Testing Library (future), coverlet code coverage.
 - **Key patterns:** `Mock<IUnitOfWork>`, controller tests with mocked `HttpContext`+`ClaimsPrincipal`, domain entity behavior tests, FluentValidation rule tests.
-- **Files:** `tests/`
+- **Files:** `src/backend/AppBaseNetReact.*.Tests/`
 
 ### 🔒 SECURITY AUDIT
 - **Focus:** Authentication, authorization, data protection, OWASP. JWT (HS512, short-lived, refresh rotation), rate limiting (Login 10/min, ForgotPassword 3/hr), account lockout (5→15min), password policy, security headers (CSP, X-Frame-Options), audit logging, anti-enumeration, SQL injection prevention (EF parameterized), CSRF via JWT.

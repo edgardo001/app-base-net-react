@@ -59,7 +59,9 @@ npm run dev
 │   │   ├── AppBaseNetReact.Domain/       # Entidades, Value Objects, Enums (0 dependencias externas)
 │   │   ├── AppBaseNetReact.Application/  # CQRS, Interfaces, Validación FluentValidation
 │   │   ├── AppBaseNetReact.Infrastructure/ # EF Core Configurations, JWT, Email, Repositories
-│   │   └── AppBaseNetReact.WebApi/       # Controllers, Middleware, Program.cs, Filters
+│   │   ├── AppBaseNetReact.WebApi/       # Controllers, Middleware, Program.cs, Filters
+│   │   ├── AppBaseNetReact.Application.Tests/  # Unit tests — servicios, validadores
+│   │   └── AppBaseNetReact.WebApi.Tests/       # Controller tests
 │   ├── frontend/                       # React 19 + Vite 8
 │   │   ├── src/stores/                 # Zustand (auth-store)
 │   │   ├── src/lib/                    # API client (Axios), utils
@@ -68,9 +70,6 @@ npm run dev
 │   │   ├── src/components/auth/        # Auth guards (SessionWarning)
 │   │   └── src/pages/                  # Login, Dashboard, Users, Roles, Permissions...
 │   └── docker/                         # Dockerfiles, nginx.conf, docker-compose.yml
-├── tests/
-│   ├── AppBaseNetReact.Application.Tests/  # Unit tests — servicios, validadores
-│   └── AppBaseNetReact.WebApi.Tests/       # Controller tests
 ```
 
 ## API Endpoints
@@ -124,8 +123,8 @@ dotnet test AppBaseNetReact.slnx
 dotnet test AppBaseNetReact.slnx --collect:"XPlat Code Coverage"
 
 # Tests por capa
-dotnet test tests/AppBaseNetReact.Application.Tests
-dotnet test tests/AppBaseNetReact.WebApi.Tests
+dotnet test src/backend/AppBaseNetReact.Application.Tests
+dotnet test src/backend/AppBaseNetReact.WebApi.Tests
 ```
 
 Los tests siguen el patrón `[Clase]_[Método]_[Escenario]_[ResultadoEsperado]` con xUnit + Moq + FluentAssertions.
