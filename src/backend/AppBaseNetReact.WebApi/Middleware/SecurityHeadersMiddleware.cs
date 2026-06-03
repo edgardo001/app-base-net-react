@@ -18,6 +18,7 @@ public class SecurityHeadersMiddleware
     //   Referrer-Policy: strict-origin-when-cross-origin — solo envía referrer en mismo origen
     //   Permissions-Policy: camera=(self), microphone=() — restringe APIs sensibles
     //   Content-Security-Policy: permite scripts de Cloudflare (Turnstile captcha), bloquera inline styles
+    //   NOTA: 'unsafe-eval' y 'unsafe-inline' en script-src son necesarios para Scalar UI (Vue/highlight.js).
     public async Task InvokeAsync(HttpContext context)
     {
         context.Response.OnStarting(() =>
@@ -29,10 +30,12 @@ public class SecurityHeadersMiddleware
             context.Response.Headers.TryAdd("Permissions-Policy", "camera=(self), microphone=()");
             context.Response.Headers.TryAdd("Content-Security-Policy",
                 "default-src 'self'; " +
-                "script-src 'self' https://challenges.cloudflare.com; " +
+                "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com; " +
                 "frame-src https://challenges.cloudflare.com; " +
                 "img-src 'self' data: blob:; " +
-                "style-src 'self' 'unsafe-inline';");
+                "style-src 'self' 'unsafe-inline'; " +
+                "font-src 'self' https://fonts.scalar.com data:; " +
+                "connect-src 'self' https://api.scalar.com;");
             return Task.CompletedTask;
         });
 
