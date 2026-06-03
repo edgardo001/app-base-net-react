@@ -29,10 +29,10 @@
 ```
 netReactMVP/
 ├── backend/
-│   └── UserManagement.sln
+│   └── AppBaseNetReact.sln
 │       ├── src/
-│       │   ├── UserManagement.Domain/           # Entidades, Value Objects, Enums, Domain Events
-│       │   ├── UserManagement.Application/      # Casos de uso, DTOs, Interfaces de puertos
+│       │   ├── AppBaseNetReact.Domain/           # Entidades, Value Objects, Enums, Domain Events
+│       │   ├── AppBaseNetReact.Application/      # Casos de uso, DTOs, Interfaces de puertos
 │       │   │   ├── Common/                      # Behaviors, Exceptions, Mappings
 │       │   │   ├── Features/
 │       │   │   │   ├── Auth/                    # Login, Register, Refresh, Logout, ForgotPassword
@@ -41,22 +41,22 @@ netReactMVP/
 │       │   │   │   ├── Profile/                 # Perfil propio del usuario
 │       │   │   │   └── Admin/                   # Dashboard, auditoría
 │       │   │   └── Interfaces/                  # Puertos: repositorios, servicios
-│       │   ├── UserManagement.Infrastructure/   # Implementaciones concretas
+│       │   ├── AppBaseNetReact.Infrastructure/   # Implementaciones concretas
 │       │   │   ├── Persistence/                 # DbContext, Migrations, Repositorios
 │       │   │   ├── Identity/                    # Password hasher, JWT provider, Token store
 │       │   │   ├── Email/                       # MailKit implementation
 │       │   │   ├── Storage/                     # Imágenes (local, S3-compatible)
 │       │   │   └── Services/                    # DateTime provider, etc.
-│       │   └── UserManagement.WebApi/           # Controllers, Middleware, Program.cs
+│       │   └── AppBaseNetReact.WebApi/           # Controllers, Middleware, Program.cs
 │       │       ├── Controllers/
 │       │       ├── Middleware/
 │       │       ├── Filters/
 │       │       └── Program.cs
 │       └── tests/
-│           ├── UserManagement.Domain.Tests/
-│           ├── UserManagement.Application.Tests/
-│           ├── UserManagement.Infrastructure.Tests/
-│           └── UserManagement.WebApi.Tests/
+│           ├── AppBaseNetReact.Domain.Tests/
+│           ├── AppBaseNetReact.Application.Tests/
+│           ├── AppBaseNetReact.Infrastructure.Tests/
+│           └── AppBaseNetReact.WebApi.Tests/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/          # UI components (shadcn/ui + custom)
@@ -506,6 +506,7 @@ Cada usuario puede tener **múltiples roles**, heredando los permisos y accesos 
 
 #### Módulo de Autenticación
 - **Login**: Email + Password + Turnstile (si configurado)
+- **Manejo de error de conexión**: Si el login falla porque la API no responde (servidor caído, red caída), mostrar una alerta visual clara al usuario indicando que el servicio no está disponible en este momento, sin revelar detalles técnicos.
 - **Olvidé mi contraseña**: Email → envío de clave temporal
 - **Cambio de contraseña obligatorio**: Al primer inicio con clave temporal o clave expirada
 - **Sesión próxima a expirar**: Modal con countdown de 30 segundos
@@ -865,14 +866,14 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet restore
-RUN dotnet publish src/UserManagement.WebApi -c Release -o /publish
+RUN dotnet publish src/AppBaseNetReact.WebApi -c Release -o /publish
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /publish .
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "UserManagement.WebApi.dll"]
+ENTRYPOINT ["dotnet", "AppBaseNetReact.WebApi.dll"]
 ```
 
 ### Dockerfile.frontend (multi-stage)

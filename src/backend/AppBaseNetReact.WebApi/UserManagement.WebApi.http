@@ -1,0 +1,6 @@
+@AppBaseNetReact.WebApi_HostAddress = http://localhost:5011
+
+GET {{AppBaseNetReact.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

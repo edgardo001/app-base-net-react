@@ -1,9 +1,9 @@
 @echo off
-title User Management Platform
+title App Base Net React
 cd /d "%~dp0"
 
 echo ========================================
-echo   User Management Platform - Starting...
+echo   app-base-net-react - Starting...
 echo ========================================
 echo.
 
@@ -22,7 +22,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [2/3] Starting Backend (http://localhost:5011)...
-start "Backend" cmd /k "dotnet run --project src\backend\UserManagement.WebApi --launch-profile http"
+start "Backend" cmd /k "dotnet run --project src\backend\AppBaseNetReact.WebApi --launch-profile http"
 
 timeout /t 8 /nobreak >nul
 

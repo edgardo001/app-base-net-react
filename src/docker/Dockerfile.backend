@@ -3,15 +3,15 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 # Layer 1: restore con cache de NuGet (solo cambia si .csproj cambia)
-COPY ["src/backend/UserManagement.Domain/UserManagement.Domain.csproj", "backend/UserManagement.Domain/"]
-COPY ["src/backend/UserManagement.Application/UserManagement.Application.csproj", "backend/UserManagement.Application/"]
-COPY ["src/backend/UserManagement.Infrastructure/UserManagement.Infrastructure.csproj", "backend/UserManagement.Infrastructure/"]
-COPY ["src/backend/UserManagement.WebApi/UserManagement.WebApi.csproj", "backend/UserManagement.WebApi/"]
-RUN dotnet restore "backend/UserManagement.WebApi/UserManagement.WebApi.csproj"
+COPY ["src/backend/AppBaseNetReact.Domain/AppBaseNetReact.Domain.csproj", "backend/AppBaseNetReact.Domain/"]
+COPY ["src/backend/AppBaseNetReact.Application/AppBaseNetReact.Application.csproj", "backend/AppBaseNetReact.Application/"]
+COPY ["src/backend/AppBaseNetReact.Infrastructure/AppBaseNetReact.Infrastructure.csproj", "backend/AppBaseNetReact.Infrastructure/"]
+COPY ["src/backend/AppBaseNetReact.WebApi/AppBaseNetReact.WebApi.csproj", "backend/AppBaseNetReact.WebApi/"]
+RUN dotnet restore "backend/AppBaseNetReact.WebApi/AppBaseNetReact.WebApi.csproj"
 
 # Layer 2: build y publish
 COPY ["src/backend/", "backend/"]
-WORKDIR "/src/backend/UserManagement.WebApi"
+WORKDIR "/src/backend/AppBaseNetReact.WebApi"
 RUN dotnet build -c $BUILD_CONFIGURATION --no-restore
 RUN dotnet publish -c $BUILD_CONFIGURATION -o /app --no-build
 
@@ -19,4 +19,4 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 EXPOSE 8080
 COPY --from=build /app .
-ENTRYPOINT ["dotnet", "UserManagement.WebApi.dll"]
+ENTRYPOINT ["dotnet", "AppBaseNetReact.WebApi.dll"]

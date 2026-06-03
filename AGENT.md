@@ -75,7 +75,7 @@
   - IP + User-Agent capture in audit logs
   - Refresh token hashing with SHA-256 + `FixedTimeEquals`
   - Permission-based authorization via JWT claims
-- **Files:** `src/backend/UserManagement.WebApi/Middleware/`, `src/backend/UserManagement.WebApi/Controllers/AuthController.cs`
+- **Files:** `src/backend/AppBaseNetReact.WebApi/Middleware/`, `src/backend/AppBaseNetReact.WebApi/Controllers/AuthController.cs`
 
 ### 🚀 DEVOPS
 - **Focus:** CI/CD, Docker, deployment, monitoring, secrets

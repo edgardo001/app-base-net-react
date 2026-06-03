@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "========================================"
-echo "  User Management Platform - Starting..."
+echo "  app-base-net-react - Starting..."
 echo "========================================"
 echo ""
 
@@ -23,14 +23,14 @@ fi
 
 echo "[2/3] Starting Backend (http://localhost:5011)..."
 if command -v gnome-terminal &>/dev/null; then
-    gnome-terminal --title="Backend" -- bash -c "dotnet run --project src/backend/UserManagement.WebApi --launch-profile http; exec bash"
+    gnome-terminal --title="Backend" -- bash -c "dotnet run --project src/backend/AppBaseNetReact.WebApi --launch-profile http; exec bash"
 elif command -v xterm &>/dev/null; then
-    xterm -T "Backend" -e "dotnet run --project src/backend/UserManagement.WebApi --launch-profile http" &
+    xterm -T "Backend" -e "dotnet run --project src/backend/AppBaseNetReact.WebApi --launch-profile http" &
 elif command -v konsole &>/dev/null; then
-    konsole --new-tab -p tab-title="Backend" -e "dotnet run --project src/backend/UserManagement.WebApi --launch-profile http" &
+    konsole --new-tab -p tab-title="Backend" -e "dotnet run --project src/backend/AppBaseNetReact.WebApi --launch-profile http" &
 else
     echo "      WARNING: Starting backend in background (logs in backend.log)..."
-    dotnet run --project src/backend/UserManagement.WebApi --launch-profile http > backend.log 2>&1 &
+    dotnet run --project src/backend/AppBaseNetReact.WebApi --launch-profile http > backend.log 2>&1 &
 fi
 
 sleep 5

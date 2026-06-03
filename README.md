@@ -38,8 +38,8 @@ cp .env.template .env
 docker compose -f src/docker/docker-compose.yml up postgres -d
 
 # 3. Backend (http://localhost:5011)
-dotnet build UserManagement.slnx
-dotnet run --project src/backend/UserManagement.WebApi
+dotnet build AppBaseNetReact.slnx
+dotnet run --project src/backend/AppBaseNetReact.WebApi
 
 # 4. Frontend (http://localhost:5173)
 cd src/frontend
@@ -50,16 +50,16 @@ npm run dev
 ## Estructura del proyecto
 
 ```
-├── UserManagement.slnx          # Solución .NET (formato SLNX)
+├── AppBaseNetReact.slnx          # Solución .NET (formato SLNX)
 ├── .env.template                # Template de variables de entorno
 ├── AGENTS.md                    # Guía multi-agente para asistentes IA
 ├── DESIGN.md                    # Architecture Decision Records (ADRs)
 ├── src/
 │   ├── backend/
-│   │   ├── UserManagement.Domain/       # Entidades, Value Objects, Enums (0 dependencias externas)
-│   │   ├── UserManagement.Application/  # CQRS, Interfaces, Validación FluentValidation
-│   │   ├── UserManagement.Infrastructure/ # EF Core Configurations, JWT, Email, Repositories
-│   │   └── UserManagement.WebApi/       # Controllers, Middleware, Program.cs, Filters
+│   │   ├── AppBaseNetReact.Domain/       # Entidades, Value Objects, Enums (0 dependencias externas)
+│   │   ├── AppBaseNetReact.Application/  # CQRS, Interfaces, Validación FluentValidation
+│   │   ├── AppBaseNetReact.Infrastructure/ # EF Core Configurations, JWT, Email, Repositories
+│   │   └── AppBaseNetReact.WebApi/       # Controllers, Middleware, Program.cs, Filters
 │   ├── frontend/                       # React 19 + Vite 8
 │   │   ├── src/stores/                 # Zustand (auth-store)
 │   │   ├── src/lib/                    # API client (Axios), utils
@@ -69,8 +69,8 @@ npm run dev
 │   │   └── src/pages/                  # Login, Dashboard, Users, Roles, Permissions...
 │   └── docker/                         # Dockerfiles, nginx.conf, docker-compose.yml
 ├── tests/
-│   ├── UserManagement.Application.Tests/  # Unit tests — servicios, validadores
-│   └── UserManagement.WebApi.Tests/       # Controller tests
+│   ├── AppBaseNetReact.Application.Tests/  # Unit tests — servicios, validadores
+│   └── AppBaseNetReact.WebApi.Tests/       # Controller tests
 ```
 
 ## API Endpoints
@@ -118,14 +118,14 @@ Al iniciar por primera vez, el seeder crea:
 
 ```bash
 # Ejecutar todos los tests
-dotnet test UserManagement.slnx
+dotnet test AppBaseNetReact.slnx
 
 # Ejecutar tests con cobertura
-dotnet test UserManagement.slnx --collect:"XPlat Code Coverage"
+dotnet test AppBaseNetReact.slnx --collect:"XPlat Code Coverage"
 
 # Tests por capa
-dotnet test tests/UserManagement.Application.Tests
-dotnet test tests/UserManagement.WebApi.Tests
+dotnet test tests/AppBaseNetReact.Application.Tests
+dotnet test tests/AppBaseNetReact.WebApi.Tests
 ```
 
 Los tests siguen el patrón `[Clase]_[Método]_[Escenario]_[ResultadoEsperado]` con xUnit + Moq + FluentAssertions.
@@ -153,16 +153,16 @@ Ver [`AGENTS.md`](./AGENTS.md) para guías de workflow multi-agente.
 
 ```bash
 # Backend
-dotnet build UserManagement.slnx
-dotnet watch run --project src/backend/UserManagement.WebApi
+dotnet build AppBaseNetReact.slnx
+dotnet watch run --project src/backend/AppBaseNetReact.WebApi
 
 # Frontend
 cd src/frontend && npm run dev
 npm run build              # Producción
 
 # Base de datos (EF Core)
-dotnet ef migrations add <Nombre> --project src/backend/UserManagement.Infrastructure --startup-project src/backend/UserManagement.WebApi
-dotnet ef database update --project src/backend/UserManagement.Infrastructure --startup-project src/backend/UserManagement.WebApi
+dotnet ef migrations add <Nombre> --project src/backend/AppBaseNetReact.Infrastructure --startup-project src/backend/AppBaseNetReact.WebApi
+dotnet ef database update --project src/backend/AppBaseNetReact.Infrastructure --startup-project src/backend/AppBaseNetReact.WebApi
 
 # Docker (full stack con Traefik)
 docker compose -f src/docker/docker-compose.yml --env-file .env up -d

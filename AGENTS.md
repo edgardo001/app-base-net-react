@@ -2,12 +2,12 @@
 
 ## Project Structure
 - `.env.template` — Template for environment variables (copy to `.env`)
-- `UserManagement.slnx` — Solution file at repo root
+- `AppBaseNetReact.slnx` — Solution file at repo root
 - `src/backend/` — .NET 10 solution with hexagonal architecture
-  - `UserManagement.Domain/` — Entities, ValueObjects, Enums, Common
-  - `UserManagement.Application/` — Commands, Queries, Validators, Interfaces
-  - `UserManagement.Infrastructure/` — Persistence, Services, Identity, Email
-  - `UserManagement.WebApi/` — Controllers, Middleware, Filters, Program.cs
+  - `AppBaseNetReact.Domain/` — Entities, ValueObjects, Enums, Common
+  - `AppBaseNetReact.Application/` — Commands, Queries, Validators, Interfaces
+  - `AppBaseNetReact.Infrastructure/` — Persistence, Services, Identity, Email
+  - `AppBaseNetReact.WebApi/` — Controllers, Middleware, Filters, Program.cs
 - `src/frontend/` — React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui v4
   - `src/stores/` — Zustand stores (auth-store)
   - `src/lib/` — API client, utility functions
@@ -38,7 +38,7 @@ docker run -d --name mvp-postgres ^
 ### Step 2: Run Backend
 ```bash
 # Terminal 1 — Backend (http://localhost:5011)
-dotnet run --project src/backend/UserManagement.WebApi --launch-profile http
+dotnet run --project src/backend/AppBaseNetReact.WebApi --launch-profile http
 ```
 - API: `http://localhost:5011/api/...`
 - Scalar UI (docs): `http://localhost:5011/scalar/v1`
@@ -56,20 +56,20 @@ cd src/frontend && npm run dev
 ## Key Commands
 ```bash
 # Build .NET backend
-dotnet build UserManagement.slnx
+dotnet build AppBaseNetReact.slnx
 
 # Build frontend
 cd src/frontend && npm run build
 
 # Run all tests
-dotnet test UserManagement.slnx
+dotnet test AppBaseNetReact.slnx
 
 # Docker compose up (full stack + Traefik)
 docker compose -f src/docker/docker-compose.yml --env-file .env up -d
 
 # EF Migrations
-dotnet ef migrations add <Name> --project src/backend/UserManagement.Infrastructure --startup-project src/backend/UserManagement.WebApi
-dotnet ef database update --project src/backend/UserManagement.Infrastructure --startup-project src/backend/UserManagement.WebApi
+dotnet ef migrations add <Name> --project src/backend/AppBaseNetReact.Infrastructure --startup-project src/backend/AppBaseNetReact.WebApi
+dotnet ef database update --project src/backend/AppBaseNetReact.Infrastructure --startup-project src/backend/AppBaseNetReact.WebApi
 ```
 
 ## Architecture Rules
@@ -98,7 +98,7 @@ dotnet ef database update --project src/backend/UserManagement.Infrastructure --
 - All API responses use `ApiResponse<T>` wrapper
 - Commands = CQRS write operations, Queries = read operations
 - Each feature has: Command/Query → Handler → Validator → DTO/Response
-- Tests mirror source structure: `tests/UserManagement.*.Tests/`
+- Tests mirror source structure: `tests/AppBaseNetReact.*.Tests/`
 
 ## OpenSpec Workflow
 - `/opsx-explore` — Think through problems before coding

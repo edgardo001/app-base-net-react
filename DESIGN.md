@@ -330,7 +330,7 @@
 - Moq: >60% .NET market share — largest knowledge base
 - FluentAssertions: `result.Should().Be(expected)` reads naturally compared to `Assert.Equal(expected, result)`
 - FluentAssertions: descriptive failure messages dramatically speed debugging
-- Test project naming mirrors source: `tests/UserManagement.{Layer}.Tests/`
+- Test project naming mirrors source: `tests/AppBaseNetReact.{Layer}.Tests/`
 
 **Trade-offs:**
 - Moq 4.x is the legacy pipeline; 5.x (still preview) uses .NET Castle.Core differently
