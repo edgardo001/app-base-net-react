@@ -8,6 +8,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UserManagement.Application.Common.Interfaces;
+using UserManagement.Application.Common.Validators;
 using UserManagement.Domain.Entities;
 using UserManagement.WebApi.Filters;
 
@@ -201,6 +202,4 @@ public class RoleDto
     public string Name { get; set; } = string.Empty;
 }
 
-public record CreateUserRequest(string Email, string FirstName, string LastName, string Password, List<Guid>? RoleIds);
-public record UpdateUserRequest(string FirstName, string LastName, List<Guid>? RoleIds);
 public record ToggleActiveRequest(bool Active);

@@ -2,6 +2,14 @@ using UserManagement.Domain.Common;
 
 namespace UserManagement.Domain.Entities;
 
+// RefreshToken implementa rotation + reuse detection:
+// 1. Rotation: cada vez que se refresca un token, el anterior se revoca (RevokedAt) y se registra
+//    el hash del reemplazo (ReplacedByTokenHash). El nuevo token se asocia al mismo JwtId.
+// 2. Reuse detection: si un token ya revocado se presenta, se revocan TODOS los tokens del usuario
+//    (sesion comprometida). Esto se detecta comparando ReplacedByTokenHash contra el hash presentado.
+// 3. TokenHash: solo se almacena SHA-256 del token real. El token plano se devuelve al crear/refrescar.
+// 4. JwtId (jti claim): correlaciona el refresh token con el access token actual.
+// 5. RevokedBy: permite rastrear quien o que proceso revoco el token (admin, sistema, reuse detection).
 public sealed class RefreshToken : BaseEntity
 {
     public Guid UserId { get; private set; }
@@ -36,6 +44,8 @@ public sealed class RefreshToken : BaseEntity
         };
     }
 
+    // Revoca el token y opcionalmente registra el hash del token que lo reemplaza.
+    // replacedByTokenHash es el hash del nuevo refresh token (rotation).
     public void Revoke(Guid? revokedBy = null, string? replacedByTokenHash = null)
     {
         RevokedAt = DateTime.UtcNow;

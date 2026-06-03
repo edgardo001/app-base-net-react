@@ -2,6 +2,10 @@ using UserManagement.Domain.Common;
 
 namespace UserManagement.Domain.Entities;
 
+// Registro inmutable de intentos de login (exitosos y fallidos).
+// Usado por el rate limiting y lockout logic: se consultan intentos fallidos recientes
+// para determinar si se debe bloquear la cuenta o la IP.
+// Tabla de auditoria: no se modifica ni elimina (solo insercion).
 public sealed class LoginAttempt : BaseEntity
 {
     public string Email { get; private set; } = string.Empty;

@@ -28,11 +28,21 @@ public interface IAuditLogRepository : IRepository<AuditLog>
     Task<IReadOnlyList<AuditLog>> GetByUserAsync(Guid userId, int limit = 50, CancellationToken ct = default);
 }
 
+public interface IPermissionRepository : IRepository<Permission>
+{
+}
+
+public interface ILoginAttemptRepository : IRepository<LoginAttempt>
+{
+}
+
 public interface IUnitOfWork
 {
     IUserRepository Users { get; }
     IRoleRepository Roles { get; }
+    IPermissionRepository Permissions { get; }
     IRefreshTokenRepository RefreshTokens { get; }
     IAuditLogRepository AuditLogs { get; }
+    ILoginAttemptRepository LoginAttempts { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

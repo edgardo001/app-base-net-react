@@ -170,3 +170,13 @@ public class AuditLogRepository : GenericRepository<AuditLog>, IAuditLogReposito
             .Take(limit)
             .ToListAsync(ct);
 }
+
+public class PermissionRepository : GenericRepository<Permission>, IPermissionRepository
+{
+    public PermissionRepository(AppDbContext context) : base(context) { }
+}
+
+public class LoginAttemptRepository : GenericRepository<LoginAttempt>, ILoginAttemptRepository
+{
+    public LoginAttemptRepository(AppDbContext context) : base(context) { }
+}

@@ -25,6 +25,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(u => u.Email).IsUnique().HasDatabaseName("IX_Users_Email");
         builder.HasIndex(u => u.IsActive).HasDatabaseName("IX_Users_IsActive");
         builder.HasIndex(u => u.DeletedAt).HasDatabaseName("IX_Users_DeletedAt");
+            // Soft delete global filter: excluye usuarios eliminados de TODAS las queries.
+        // Para incluir eliminados, usar .IgnoreQueryFilters().
         builder.HasQueryFilter(u => u.DeletedAt == null);
     }
 }
@@ -78,6 +80,11 @@ public class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
             .WithMany(r => r.UserRoles)
             .HasForeignKey(ur => ur.RoleId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Query filter en dependencia: EF Core requiere que las navigaciones requeridas
+        // tengan filtros consistentes con el filter de User (DeletedAt == null).
+        // Sin esto, EF Core advierte que la navigation User podria ser null.
+        builder.HasQueryFilter(ur => ur.User.DeletedAt == null);
     }
 }
 
@@ -122,6 +129,11 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .WithMany(u => u.RefreshTokens)
             .HasForeignKey(rt => rt.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Query filter redundante: EF Core valida que las navigations requeridas no sean filtradas.
+        // Sin este filtro, EF advierte que User podria ser null por el global filter en UserConfiguration.
+        // Ver: https://learn.microsoft.com/ef/core/querying/filters#required-navigation-filters
+        builder.HasQueryFilter(rt => rt.User.DeletedAt == null);
     }
 }
 

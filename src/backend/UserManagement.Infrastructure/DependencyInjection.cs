@@ -23,15 +23,22 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
+        services.Configure<PasswordPolicySettings>(configuration.GetSection("PasswordPolicy"));
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
 
         var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()
             ?? throw new InvalidOperationException("JWT settings not configured");
 
+        // Limpia el mapeo de claims por defecto de Microsoft.IdentityModel.
+        // Por defecto, "sub" se mapea a ClaimTypes.NameIdentifier, "email" a ClaimTypes.Email, etc.
+        // Esto causa que los claims del JWT se pierdan o se mapeen incorrectamente.
+        // Al limpiarlo, los claims se mantienen con sus nombres originales (JWT standard).
         JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
         services.AddAuthentication(options =>

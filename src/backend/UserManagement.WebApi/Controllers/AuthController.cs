@@ -1,13 +1,8 @@
-// Sin referencia a Microsoft.EntityFrameworkCore aqui (los controllers
-// solo dependen de IUnitOfWork/IJwtService via Application.Interfaces).
-// Esto mantiene la WebApi desacoplada del ORM y permite cambiar EF
-// Core por Dapper u otro sin tocar los controllers.
-// Se usa "sub" en vez de JwtRegisteredClaimNames.Sub porque esa
-// clase vive en Microsoft.IdentityModel.JsonWebTokens y requeriria
-// agregar el package directamente a WebApi. El claim "sub" es un
-// estandar JWT (RFC 7519) que nunca cambia.
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using UserManagement.Application.Common.Interfaces;
+using UserManagement.Application.Common.Validators;
+using UserManagement.Domain.Entities;
 using UserManagement.WebApi.Filters;
 
 namespace UserManagement.WebApi.Controllers;
@@ -20,34 +15,63 @@ public class AuthController : ControllerBase
     private readonly IPasswordHasherService _hasher;
     private readonly IUnitOfWork _uow;
     private readonly IDateTimeProvider _clock;
+    private readonly IAuditService _audit;
+    private readonly IPasswordPolicyService _passwordPolicy;
 
     public AuthController(
         IJwtService jwt,
         IPasswordHasherService hasher,
         IUnitOfWork uow,
-        IDateTimeProvider clock)
+        IDateTimeProvider clock,
+        IAuditService audit,
+        IPasswordPolicyService passwordPolicy)
     {
         _jwt = jwt;
         _hasher = hasher;
         _uow = uow;
         _clock = clock;
+        _audit = audit;
+        _passwordPolicy = passwordPolicy;
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("Login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var user = await _uow.Users.GetByEmailAsync(request.Email, ct);
+
         if (user == null || !_hasher.VerifyPassword(request.Password, user.PasswordHash))
+        {
+            if (user != null)
+            {
+                user.IncrementFailedAccess();
+                if (user.AccessFailedCount >= _passwordPolicy.MaxFailedAccessAttempts)
+                    user.LockUntil(_clock.UtcNow.AddMinutes(_passwordPolicy.DefaultLockoutMinutes));
+                await _uow.SaveChangesAsync(ct);
+            }
+
+            await LogLoginAttempt(request.Email, false, "Invalid credentials", ct);
             return Unauthorized(ApiResponse<object>.Fail("Invalid email or password"));
+        }
 
         if (!user.IsActive)
+        {
+            await LogLoginAttempt(request.Email, false, "Account deactivated", ct);
             return Unauthorized(ApiResponse<object>.Fail("Account is deactivated"));
+        }
 
         if (user.IsLocked())
-            return StatusCode(423, ApiResponse<object>.Fail("Account is locked. Try again later."));
+        {
+            var remaining = (user.LockoutEnd!.Value - _clock.UtcNow).Minutes;
+            await LogLoginAttempt(request.Email, false, "Account locked", ct);
+            return StatusCode(423, ApiResponse<object>.Fail($"Account is locked. Try again in {remaining} minutes."));
+        }
 
         if (!user.EmailConfirmed)
+        {
+            await LogLoginAttempt(request.Email, false, "Email not confirmed", ct);
             return StatusCode(403, ApiResponse<object>.Fail("Email not confirmed. Check your inbox."));
+        }
 
         user.MarkLogin();
         await _uow.SaveChangesAsync(ct);
@@ -57,13 +81,20 @@ public class AuthController : ControllerBase
         var refreshToken = _jwt.GenerateRefreshToken();
         var tokenHash = _jwt.HashRefreshToken(refreshToken);
 
-        var token = Domain.Entities.RefreshToken.Create(
+        var token = RefreshToken.Create(
             user.Id, Guid.NewGuid(), tokenHash,
             _clock.UtcNow.AddDays(7),
             Request.Headers.UserAgent, HttpContext.Connection.RemoteIpAddress?.ToString());
 
         await _uow.RefreshTokens.AddAsync(token, ct);
         await _uow.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(
+            "UserLoggedIn", "User", user.Id.ToString(),
+            null, null, user.Id,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString(),
+            $"User {user.Email} logged in", ct);
 
         return Ok(ApiResponse<object>.Ok(new
         {
@@ -87,8 +118,17 @@ public class AuthController : ControllerBase
 
         if (storedToken.IsRevoked)
         {
+            // Token reuse detection — revoke all sessions for this user
             await _uow.RefreshTokens.RevokeAllForUserAsync(storedToken.UserId, null, ct);
             await _uow.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(
+                "TokenReuseDetected", "RefreshToken", storedToken.Id.ToString(),
+                null, null, storedToken.UserId,
+                HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                Request.Headers.UserAgent.ToString(),
+                "Compromised refresh token detected — all sessions revoked", ct);
+
             return Unauthorized(ApiResponse<object>.Fail("Token compromised. All sessions revoked."));
         }
 
@@ -106,7 +146,7 @@ public class AuthController : ControllerBase
         var newRefreshToken = _jwt.GenerateRefreshToken();
         var newTokenHash = _jwt.HashRefreshToken(newRefreshToken);
 
-        var newToken = Domain.Entities.RefreshToken.Create(
+        var newToken = RefreshToken.Create(
             user.Id, Guid.NewGuid(), newTokenHash,
             _clock.UtcNow.AddDays(7),
             Request.Headers.UserAgent, HttpContext.Connection.RemoteIpAddress?.ToString());
@@ -131,6 +171,13 @@ public class AuthController : ControllerBase
         if (storedToken != null)
         {
             storedToken.Revoke();
+
+            await _audit.LogAsync(
+                "UserLoggedOut", "RefreshToken", storedToken.Id.ToString(),
+                null, null, storedToken.UserId,
+                HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                Request.Headers.UserAgent.ToString(), null, ct);
+
             await _uow.SaveChangesAsync(ct);
         }
 
@@ -151,14 +198,48 @@ public class AuthController : ControllerBase
         if (!_hasher.VerifyPassword(request.CurrentPassword, user.PasswordHash))
             return BadRequest(ApiResponse<object>.Fail("Current password is incorrect"));
 
-        if (request.NewPassword != request.ConfirmPassword)
-            return BadRequest(ApiResponse<object>.Fail("Passwords do not match"));
+        var (valid, error) = _passwordPolicy.Validate(request.NewPassword);
+        if (!valid)
+            return BadRequest(ApiResponse<object>.Fail(error));
 
         user.SetPasswordHash(_hasher.HashPassword(request.NewPassword));
         await _uow.RefreshTokens.RevokeAllForUserAsync(userId, userId, ct);
         await _uow.SaveChangesAsync(ct);
 
+        await _audit.LogAsync(
+            "PasswordChanged", "User", user.Id.ToString(),
+            null, null, userId,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString(), null, ct);
+
         return Ok(ApiResponse<object>.Ok(null, "Password changed successfully"));
+    }
+
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("ForgotPassword")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
+    {
+        var user = await _uow.Users.GetByEmailAsync(request.Email, ct);
+        // Always return success to prevent email enumeration
+        if (user == null)
+            return Ok(ApiResponse<object>.Ok(null, "If the email exists, a password reset link has been sent."));
+
+        var tempPassword = Guid.NewGuid().ToString("N")[..12];
+        user.SetPasswordHash(_hasher.HashPassword(tempPassword));
+        user.ForcePasswordChange();
+        await _uow.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(
+            "PasswordResetRequested", "User", user.Id.ToString(),
+            null, null, user.Id,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString(), "Temporary password generated", ct);
+
+        // TODO: Send email with temp password when EmailService is configured
+
+        return Ok(ApiResponse<object>.Ok(
+            new { TemporaryPassword = tempPassword },
+            "If the email exists, a password reset link has been sent."));
     }
 
     private async Task<List<string>> GetUserPermissions(Guid userId, CancellationToken ct)
@@ -173,8 +254,17 @@ public class AuthController : ControllerBase
             .Distinct()
             .ToList();
     }
+
+    private async Task LogLoginAttempt(string email, bool success, string? reason, CancellationToken ct)
+    {
+        var attempt = LoginAttempt.Create(
+            email,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            success, reason);
+
+        await _uow.LoginAttempts.AddAsync(attempt, ct);
+        await _uow.SaveChangesAsync(ct);
+    }
 }
 
-public record LoginRequest(string Email, string Password);
-public record RefreshRequest(string RefreshToken);
-public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
+// Types defined in UserManagement.Application.Common.Validators

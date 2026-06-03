@@ -5,6 +5,11 @@ using Serilog;
 
 namespace UserManagement.WebApi.Middleware;
 
+// Middleware ubicado primero en el pipeline para capturar excepciones de TODOS los middleware
+// registrados despues. Sin esto, excepciones en SecurityHeadersMiddleware, Auth, etc. devolverian
+// 500 sin formato ApiResponse ni logging centralizado. Maneja ValidationException (400),
+// UnauthorizedAccessException (403), KeyNotFoundException (404), y Exception generica (500).
+// No expone detalles internos (stack trace, inner exception) por seguridad.
 public class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;

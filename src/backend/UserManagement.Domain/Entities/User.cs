@@ -2,6 +2,11 @@ using UserManagement.Domain.Common;
 
 namespace UserManagement.Domain.Entities;
 
+// Entidad User del dominio: estado y comportamiento encapsulado (private set).
+// Todos los cambios de estado se realizan a traves de metodos del dominio (Create, UpdateProfile, Lock, etc.).
+// SecurityStamp = invalida todos los tokens JWT existentes al cambiar password.
+// Email, FirstName, LastName: propiedades con getter publico y setter privado.
+// Solo se modifican via metodos de dominio que aseguran invariantes.
 public sealed class User : BaseEntity
 {
     public string Email { get; private set; } = string.Empty;
