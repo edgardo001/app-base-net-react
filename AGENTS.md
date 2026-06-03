@@ -96,6 +96,11 @@ dotnet ef database update -p src/backend/AppBaseNetReact.Infrastructure -s src/b
 - **Key patterns:** Hexagonal architecture (Domain→Application→Infrastructure→WebApi), repository + UnitOfWork, soft-delete global filters, JWT refresh rotation, rate limiting.
 - **Files:** `src/backend/`, `stores/`, `lib/`
 
+### 🏛️ ARQUITECTO DE SOFTWARE (HEXAGONAL)
+- **Focus:** Integridad arquitectónica, aplicación estricta de las reglas hexagonales, contratos entre capas, diseño de agregados, eventos de dominio, contratos puerto/adaptador. Revisa que Domain tenga cero dependencias externas, Application solo dependa de Domain, e Infrastructure implemente los puertos. Aprueba cambios cross-layer.
+- **Key patterns:** Hexagonal architecture (Ports/Adapters), aggregate roots, domain events, value objects, CQRS separation, boundary enforcement, anti-corruption layers, arch unit tests.
+- **Files:** `src/backend/Domain/`, `src/backend/Application/Common/Interfaces/`, `src/backend/Infrastructure/`, `.slnx`, architecture tests
+
 ### 🎨 UX/UI
 - **Focus:** Component architecture, design system, accessibility, responsive. shadcn/ui customization, Tailwind v4 (OKLCH, `@theme`), layout shell (sidebar, header), form UX (RHF+Zod), session countdown modal, dark/light mode (future).
 - **Key patterns:** `cn()` with `clsx`+CVA, `@base-ui/react` primitives, collapsible sidebar (localStorage), consistent spacing/tokens/typography.
@@ -119,13 +124,13 @@ dotnet ef database update -p src/backend/AppBaseNetReact.Infrastructure -s src/b
 ## Workflow Phases
 
 ### Phase 1: Exploration (`/opsx-explore`)
-[PRODUCT OWNER] defines problem+scope → [SECURITY AUDIT] identifies risks → [DEVELOPER]+[UX/UI] research feasibility → [QA] plans tests → [DEVOPS] assesses infrastructure.
+[PRODUCT OWNER] defines problem+scope → [SECURITY AUDIT] identifies risks → [DEVELOPER]+[ARQUITECTO]+[UX/UI] research feasibility → [QA] plans tests → [DEVOPS] assesses infrastructure.
 
 ### Phase 2: Proposal (`/opsx-propose`)
-[PRODUCT OWNER] → proposal.md (what+why) | [DEVELOPER] → design.md (architecture+decisions) | [QA] → tasks.md (test plan) | All → `.openspec.yaml`
+[PRODUCT OWNER] → proposal.md (what+why) | [DEVELOPER]+[ARQUITECTO] → design.md (architecture+decisions) | [QA] → tasks.md (test plan) | All → `.openspec.yaml`
 
 ### Phase 3: Implementation (`/opsx-apply`)
-For each task: [DEVELOPER] implements + adds decision comments → [QA] verifies + adds tests → [SECURITY AUDIT] reviews → [UX/UI] reviews frontend → [DEVOPS] checks docker/deploy → mark `- [x]`.
+For each task: [DEVELOPER] implements + adds decision comments → [QA] verifies + adds tests → [ARQUITECTO] reviews architecture compliance → [SECURITY AUDIT] reviews → [UX/UI] reviews frontend → [DEVOPS] checks docker/deploy → mark `- [x]`.
 
 ### Phase 4: Archive (`/opsx-archive`)
 [QA] runs full suite → [SECURITY AUDIT] signs off → [DEVOPS] deploys to staging → [PRODUCT OWNER] accepts → archive.
@@ -137,6 +142,7 @@ For each task: [DEVELOPER] implements + adds decision comments → [QA] verifies
 | Security concern | Pause, engage SECURITY AUDIT |
 | Breaking test | Pause, engage QA + DEVELOPER |
 | Infrastructure change | Notify DEVOPS for docker/deploy review |
+| Architecture violation | Pause, engage ARQUITECTO + DEVELOPER |
 | UI/UX decision | Consult UX/UI before implementing |
 | Cross-cutting change | All agents review in sequence before commit |
 
