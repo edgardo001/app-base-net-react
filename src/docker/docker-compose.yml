@@ -3,32 +3,32 @@
 # =============================================================================
 # Uso: docker compose -f src/docker/docker-compose.yml up -d
 #
-# Traefik maneja TLS automaticamente via Let's Encrypt.
-# Los dominios se configuran via environment variables en .env.
+# NOTA: Traefik se omite porque ya hay una instancia externa funcionando.
+# Las labels traefik en backend/frontend son para que el Traefik externo
+# las descubra automaticamente si esta en la misma red Docker.
 # =============================================================================
 
 services:
-  # --- Reverse Proxy con TLS automatico ---
-  traefik:
-    image: traefik:v3.3
-    container_name: traefik
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      # Dashboard (opcional, desactivar en produccion)
-      - "--api.dashboard=false"
-    ports:
-      - "443:443"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "traefik-letsencrypt:/letsencrypt"
-    networks:
-      - mvp-network
-    restart: unless-stopped
+  # Traefik desactivado — se usa una instancia externa existente
+  # traefik:
+  #   image: traefik:v3.3
+  #   container_name: traefik
+  #   command:
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+  #     - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
+  #     - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+  #     - "--api.dashboard=false"
+  #   ports:
+  #     - "443:443"
+  #   volumes:
+  #     - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  #     - "traefik-letsencrypt:/letsencrypt"
+  #   networks:
+  #     - mvp-network
+  #   restart: unless-stopped
 
   # --- Base de datos PostgreSQL 18 ---
   postgres:
@@ -101,7 +101,7 @@ services:
 
 volumes:
   postgres-data:
-  traefik-letsencrypt:
+  # traefik-letsencrypt:  # ya no se necesita al usar Traefik externo
 
 networks:
   mvp-network:
