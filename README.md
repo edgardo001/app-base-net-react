@@ -2,6 +2,10 @@
 
 Plataforma de gestión de usuarios con autenticación JWT, RBAC, y despliegue Docker con Traefik.
 
+## ⚠️ Regla de Oro
+
+> **Ningún cambio debe aplicarse sin antes verificar explícitamente que la funcionalidad original tiene un test unitario que la cubra. Si no lo tiene, se debe crear el test, validar que funcione (dotnet test), y luego aplicar el cambio. Esto previene regresiones y asegura que el comportamiento original se preserve.**
+
 ## Stack
 
 | Capa | Tecnología |

@@ -1,5 +1,9 @@
 # User Management Platform — Agent Guide
 
+## ⚠️ REGLA DE ORO — Mandatory for ALL agents
+
+> **Ningún cambio debe aplicarse sin antes verificar explícitamente que la funcionalidad original tiene un test unitario que la cubra. Si no lo tiene, se debe crear el test, validar que funcione (`dotnet test`), y luego aplicar el cambio. Esto previene regresiones y asegura que el comportamiento original se preserve.**
+
 User management platform with RBAC. .NET 10 (hexagonal/CQRS), React 19 + shadcn/ui + Tailwind v4. PostgreSQL 18, JWT auth with refresh rotation, rate limiting.
 
 ## Project Structure
