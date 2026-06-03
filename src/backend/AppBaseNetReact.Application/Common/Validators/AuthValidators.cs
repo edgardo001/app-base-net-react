@@ -34,3 +34,24 @@ public record LoginRequest(string Email, string Password);
 public record RefreshRequest(string RefreshToken);
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
 public record ForgotPasswordRequest(string Email);
+public record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
+public record ConfirmEmailRequest(string Token);
+
+public class ResetPasswordRequestValidator : AbstractValidator<ResetPasswordRequest>
+{
+    public ResetPasswordRequestValidator()
+    {
+        RuleFor(x => x.Token).NotEmpty();
+        RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(6);
+        RuleFor(x => x.ConfirmPassword).NotEmpty().Equal(x => x.NewPassword)
+            .WithMessage("Passwords do not match");
+    }
+}
+
+public class ConfirmEmailRequestValidator : AbstractValidator<ConfirmEmailRequest>
+{
+    public ConfirmEmailRequestValidator()
+    {
+        RuleFor(x => x.Token).NotEmpty();
+    }
+}

@@ -110,6 +110,9 @@ public class UserRepository : GenericRepository<User>, IUserRepository
         => await _dbSet
             .Where(u => u.UserRoles.Any(ur => ur.RoleId == roleId))
             .ToListAsync(ct);
+
+    public async Task<User?> GetByEmailConfirmationTokenAsync(string token, CancellationToken ct = default)
+        => await _dbSet.FirstOrDefaultAsync(u => u.EmailConfirmationToken == token, ct);
 }
 
 public class RoleRepository : GenericRepository<Role>, IRoleRepository

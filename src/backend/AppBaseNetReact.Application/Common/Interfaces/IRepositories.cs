@@ -6,6 +6,7 @@ public interface IUserRepository : IRepository<User>
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
     Task<User?> GetByIdWithRolesAsync(Guid id, CancellationToken ct = default);
+    Task<User?> GetByEmailConfirmationTokenAsync(string token, CancellationToken ct = default);
     Task<IReadOnlyList<User>> GetUsersByRoleAsync(Guid roleId, CancellationToken ct = default);
 }
 
