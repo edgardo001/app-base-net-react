@@ -1,8 +1,13 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Validators;
 using AppBaseNetReact.Domain.Entities;
+using AppBaseNetReact.Infrastructure.Email;
+using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -17,6 +22,10 @@ public class AuthController : ControllerBase
     private readonly IDateTimeProvider _clock;
     private readonly IAuditService _audit;
     private readonly IPasswordPolicyService _passwordPolicy;
+    private readonly IEmailService _email;
+    private readonly EmailRenderer _renderer;
+    private readonly EmailOptions _emailOptions;
+    private readonly string _frontendUrl;
 
     public AuthController(
         IJwtService jwt,
@@ -24,7 +33,11 @@ public class AuthController : ControllerBase
         IUnitOfWork uow,
         IDateTimeProvider clock,
         IAuditService audit,
-        IPasswordPolicyService passwordPolicy)
+        IPasswordPolicyService passwordPolicy,
+        IEmailService email,
+        EmailRenderer renderer,
+        IOptions<EmailOptions> emailOptions,
+        IConfiguration configuration)
     {
         _jwt = jwt;
         _hasher = hasher;
@@ -32,6 +45,10 @@ public class AuthController : ControllerBase
         _clock = clock;
         _audit = audit;
         _passwordPolicy = passwordPolicy;
+        _email = email;
+        _renderer = renderer;
+        _emailOptions = emailOptions.Value;
+        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
     }
 
     [HttpPost("login")]
@@ -46,8 +63,15 @@ public class AuthController : ControllerBase
             {
                 user.IncrementFailedAccess();
                 if (user.AccessFailedCount >= _passwordPolicy.MaxFailedAccessAttempts)
+                {
                     user.LockUntil(_clock.UtcNow.AddMinutes(_passwordPolicy.DefaultLockoutMinutes));
-                await _uow.SaveChangesAsync(ct);
+                    await _uow.SaveChangesAsync(ct);
+                    await SendAccountLockedEmail(user, ct);
+                }
+                else
+                {
+                    await _uow.SaveChangesAsync(ct);
+                }
             }
 
             await LogLoginAttempt(request.Email, false, "Invalid credentials", ct);
@@ -212,6 +236,11 @@ public class AuthController : ControllerBase
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             Request.Headers.UserAgent.ToString(), null, ct);
 
+        await SendEmail(user, "PasswordChanged", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName
+        }, ct);
+
         return Ok(ApiResponse<object>.Ok(null, "Password changed successfully"));
     }
 
@@ -224,22 +253,86 @@ public class AuthController : ControllerBase
         if (user == null)
             return Ok(ApiResponse<object>.Ok(null, "If the email exists, a password reset link has been sent."));
 
-        var tempPassword = Guid.NewGuid().ToString("N")[..12];
-        user.SetPasswordHash(_hasher.HashPassword(tempPassword));
-        user.ForcePasswordChange();
+        var resetToken = GenerateToken();
+        user.SetEmailConfirmationToken(resetToken, _clock.UtcNow.AddHours(24));
         await _uow.SaveChangesAsync(ct);
 
         await _audit.LogAsync(
             "PasswordResetRequested", "User", user.Id.ToString(),
             null, null, user.Id,
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(), "Temporary password generated", ct);
+            Request.Headers.UserAgent.ToString(), "Reset token generated", ct);
 
-        // TODO: Send email with temp password when EmailService is configured
+        var resetLink = $"{_frontendUrl}/reset-password?token={resetToken}";
 
-        return Ok(ApiResponse<object>.Ok(
-            new { TemporaryPassword = tempPassword },
-            "If the email exists, a password reset link has been sent."));
+        await SendEmail(user, "PasswordReset", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName,
+            ["ResetLink"] = resetLink
+        }, ct);
+
+        return Ok(ApiResponse<object>.Ok(null, "If the email exists, a password reset link has been sent."));
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken ct)
+    {
+        var user = await _uow.Users.GetByEmailConfirmationTokenAsync(request.Token, ct);
+        if (user == null)
+            return BadRequest(ApiResponse<object>.Fail("Invalid reset token"));
+
+        if (user.EmailConfirmationTokenExpires < _clock.UtcNow)
+            return BadRequest(ApiResponse<object>.Fail("Reset token has expired"));
+
+        var (valid, error) = _passwordPolicy.Validate(request.NewPassword);
+        if (!valid)
+            return BadRequest(ApiResponse<object>.Fail(error));
+
+        user.SetPasswordHash(_hasher.HashPassword(request.NewPassword));
+        user.ForcePasswordChange();
+        user.ConfirmEmail();
+        await _uow.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(
+            "PasswordReset", "User", user.Id.ToString(),
+            null, null, user.Id,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString(), "Password reset via token", ct);
+
+        await SendEmail(user, "PasswordChanged", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName
+        }, ct);
+
+        return Ok(ApiResponse<object>.Ok(null, "Password reset successfully"));
+    }
+
+    [HttpPost("confirm-email")]
+    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request, CancellationToken ct)
+    {
+        var user = await _uow.Users.GetByEmailConfirmationTokenAsync(request.Token, ct);
+        if (user == null)
+            return BadRequest(ApiResponse<object>.Fail("Invalid confirmation token"));
+
+        if (user.EmailConfirmationTokenExpires < _clock.UtcNow)
+            return BadRequest(ApiResponse<object>.Fail("Confirmation token has expired"));
+
+        user.ConfirmEmail();
+        await _uow.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(
+            "EmailConfirmed", "User", user.Id.ToString(),
+            null, null, user.Id,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString(), null, ct);
+
+        await SendEmail(user, "Welcome", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName,
+            ["LoginLink"] = $"{Request.Scheme}://{Request.Host}/login"
+        }, ct);
+
+        return Ok(ApiResponse<object>.Ok(null, "Email confirmed successfully"));
     }
 
     private async Task<List<string>> GetUserPermissions(Guid userId, CancellationToken ct)
@@ -264,6 +357,34 @@ public class AuthController : ControllerBase
 
         await _uow.LoginAttempts.AddAsync(attempt, ct);
         await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task SendEmail(Domain.Entities.User user, string templateName, Dictionary<string, string> extraVars, CancellationToken ct)
+    {
+        if (!_emailOptions.Templates.TryGetValue(templateName, out var config)) return;
+
+        var vars = new Dictionary<string, string>(extraVars)
+        {
+            ["Year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+        await _email.SendEmailAsync(user.Email, config.Subject, htmlBody, ct);
+    }
+
+    private async Task SendAccountLockedEmail(Domain.Entities.User user, CancellationToken ct)
+    {
+        await SendEmail(user, "AccountLocked", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName,
+            ["LockoutMinutes"] = _passwordPolicy.DefaultLockoutMinutes.ToString(),
+            ["ResetLink"] = $"{_frontendUrl}/reset-password"
+        }, ct);
+    }
+
+    private static string GenerateToken()
+    {
+        return Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     }
 }
 
