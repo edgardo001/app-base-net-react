@@ -7,9 +7,12 @@
 // introducida por extension methods de System.IO en el SDK).
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Validators;
 using AppBaseNetReact.Domain.Entities;
+using AppBaseNetReact.Infrastructure.Email;
+using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -21,11 +24,22 @@ public class UsersController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
     private readonly IPasswordHasherService _hasher;
+    private readonly IEmailService _email;
+    private readonly EmailRenderer _renderer;
+    private readonly EmailOptions _emailOptions;
 
-    public UsersController(IUnitOfWork uow, IPasswordHasherService hasher)
+    public UsersController(
+        IUnitOfWork uow,
+        IPasswordHasherService hasher,
+        IEmailService email,
+        EmailRenderer renderer,
+        IOptions<EmailOptions> emailOptions)
     {
         _uow = uow;
         _hasher = hasher;
+        _email = email;
+        _renderer = renderer;
+        _emailOptions = emailOptions.Value;
     }
 
     [HttpGet]
@@ -108,6 +122,12 @@ public class UsersController : ControllerBase
         await _uow.Users.AddAsync(user, ct);
         await _uow.SaveChangesAsync(ct);
 
+        await SendEmail(user, "Welcome", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName,
+            ["LoginLink"] = $"{Request.Scheme}://{Request.Host}/login"
+        }, ct);
+
         return CreatedAtAction(nameof(GetUser), new { id = user.Id },
             ApiResponse<object>.Ok(new { user.Id, user.Email }));
     }
@@ -164,8 +184,14 @@ public class UsersController : ControllerBase
         user.ConfirmEmail();
         await _uow.SaveChangesAsync(ct);
 
-        return Ok(ApiResponse<object>.Ok(new { TemporaryPassword = tempPassword },
-            "Temporary password generated"));
+        await SendEmail(user, "TemporaryPassword", new Dictionary<string, string>
+        {
+            ["UserName"] = user.FirstName,
+            ["TempPassword"] = tempPassword,
+            ["LoginLink"] = $"{Request.Scheme}://{Request.Host}/login"
+        }, ct);
+
+        return Ok(ApiResponse<object>.Ok(null, "Temporary password sent via email"));
     }
 
     [HttpPatch("{id:guid}/revoke-tokens")]
@@ -174,6 +200,19 @@ public class UsersController : ControllerBase
         await _uow.RefreshTokens.RevokeAllForUserAsync(id, null, ct);
         await _uow.SaveChangesAsync(ct);
         return Ok(ApiResponse<object>.Ok(null, "All sessions revoked for user"));
+    }
+
+    private async Task SendEmail(Domain.Entities.User user, string templateName, Dictionary<string, string> extraVars, CancellationToken ct)
+    {
+        if (!_emailOptions.Templates.TryGetValue(templateName, out var config)) return;
+
+        var vars = new Dictionary<string, string>(extraVars)
+        {
+            ["Year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+        await _email.SendEmailAsync(user.Email, config.Subject, htmlBody, ct);
     }
 }
 
