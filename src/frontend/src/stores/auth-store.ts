@@ -19,12 +19,17 @@ interface AuthState {
   checkAuth: () => Promise<void>
 }
 
+// Store unico de autenticacion con Zustand. Sin providers ni wrappers necesarios.
+// El estado se inicializa desde localStorage sincronicamente para evitar flash de contenido no autenticado.
+// Selector-based subscriptions: componentes usan useAuthStore((s) => s.user) para re-render solo cuando user cambia.
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   permissions: [],
   isAuthenticated: !!localStorage.getItem('accessToken'),
   passwordExpired: false,
 
+  // login: retorna true si el password esta expirado (obliga a cambio de password).
+  // Guarda tokens en localStorage para que el Axios interceptor (api.ts) los use en requests subsecuentes.
   login: async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password })
     const { accessToken, refreshToken, user: u, permissions: perms, passwordExpired } = data.data
@@ -34,6 +39,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     return !!passwordExpired
   },
 
+  // logout: intenta revocar el refresh token en backend, luego limpia storage local.
+  // Ignora errores de red (el token se limpia igual).
   logout: async () => {
     try {
       const refreshToken = localStorage.getItem('refreshToken')
@@ -45,6 +52,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, permissions: [], isAuthenticated: false })
   },
 
+  // checkAuth: verifica si el token actual aun es valido consultando /profile.
+  // Se llama al cargar la app (App.tsx) para restaurar sesion tras un refresh de pagina (F5).
   checkAuth: async () => {
     const token = localStorage.getItem('accessToken')
     if (!token) {
