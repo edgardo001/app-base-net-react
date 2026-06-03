@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using AppBaseNetReact.Application.Common.Interfaces;
+using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Identity;
 using AppBaseNetReact.Infrastructure.Persistence;
 using AppBaseNetReact.Infrastructure.Persistence.Repositories;
@@ -24,6 +25,7 @@ public static class DependencyInjection
 
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.Configure<PasswordPolicySettings>(configuration.GetSection("PasswordPolicy"));
+        services.Configure<EmailOptions>(configuration.GetSection("Email"));
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -31,6 +33,10 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
+        services.AddSingleton<EmailRenderer>();
+        services.AddSingleton<EmailQueueService>();
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IEmailJob, EmailJob>();
 
         var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()
             ?? throw new InvalidOperationException("JWT settings not configured");
