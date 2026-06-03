@@ -43,21 +43,7 @@ storage/
 uploads/
 avatars/
 
-# AI assistant configs
-.agent/
-.claude/
-.cline/
-.clinerules/
-.codex/
-.continue/
-.gemini/
-.kilocode/
-.pi/
-.roo/
-# also match at src/frontend if any appear there
-src/frontend/.agent/
-src/frontend/.claude/
-src/frontend/.cline/
+
 
 # Secrets
 *.secret
