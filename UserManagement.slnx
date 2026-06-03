@@ -7,4 +7,8 @@
     <Project Path="src/backend/UserManagement.WebApi/UserManagement.WebApi.csproj" />
   </Folder>
   <Folder Name="/src/frontend/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/UserManagement.Application.Tests/UserManagement.Application.Tests.csproj" />
+    <Project Path="tests/UserManagement.WebApi.Tests/UserManagement.WebApi.Tests.csproj" />
+  </Folder>
 </Solution>
