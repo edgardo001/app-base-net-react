@@ -10,11 +10,14 @@ Plataforma de gestión de usuarios con autenticación JWT, RBAC, y despliegue Do
 | Arquitectura | Hexagonal (Domain/Application/Infrastructure/WebApi) |
 | ORM | Entity Framework Core 10, PostgreSQL 18 |
 | Autenticación | JWT (HS512) con refresh token rotation + reuse detection |
-| Caching | Passwords: PBKDF2 (Rfc2898DeriveBytes, 100k iteraciones) |
+| Hashing | PBKDF2 (Rfc2898DeriveBytes, 100k iteraciones) |
 | Frontend | React 19, Vite 8, TypeScript, Tailwind CSS v4, shadcn/ui v4 |
 | Estado | Zustand |
-| Proxy | Traefik v3 con Let's Encrypt |
-| Contenedores | Docker Compose |
+| Validación (frontend) | React Hook Form + Zod |
+| HTTP Client | Axios con interceptor de refresh automático |
+| Proxy inverso | Traefik v3 con Let's Encrypt |
+| Testing (backend) | xUnit + Moq + FluentAssertions |
+| Contenedores | Docker Compose, imágenes Alpine multi-stage |
 
 ## Requisitos
 
@@ -34,11 +37,11 @@ cp .env.template .env
 # 2. Iniciar PostgreSQL (opcional, si no tienes local)
 docker compose -f src/docker/docker-compose.yml up postgres -d
 
-# 3. Backend
+# 3. Backend (http://localhost:5011)
 dotnet build UserManagement.slnx
 dotnet run --project src/backend/UserManagement.WebApi
 
-# 4. Frontend
+# 4. Frontend (http://localhost:5173)
 cd src/frontend
 npm install
 npm run dev
@@ -47,23 +50,91 @@ npm run dev
 ## Estructura del proyecto
 
 ```
-├── UserManagement.slnx          # Solución .NET
+├── UserManagement.slnx          # Solución .NET (formato SLNX)
 ├── .env.template                # Template de variables de entorno
+├── AGENTS.md                    # Guía multi-agente para asistentes IA
+├── DESIGN.md                    # Architecture Decision Records (ADRs)
 ├── src/
 │   ├── backend/
-│   │   ├── UserManagement.Domain/       # Entidades, Value Objects, Enums
-│   │   ├── UserManagement.Application/  # CQRS, Interfaces, Validación
-│   │   ├── UserManagement.Infrastructure/ # EF Core, JWT, Email, Persistencia
-│   │   └── UserManagement.WebApi/       # Controllers, Middleware, Program.cs
-│   ├── frontend/
-│   │   ├── src/stores/                  # Zustand (auth-store)
-│   │   ├── src/lib/                     # API client, utils
-│   │   ├── src/components/              # shadcn/ui, layout, auth
-│   │   └── src/pages/                   # Login, Dashboard, Users, Roles...
-│   └── docker/                          # Dockerfiles, nginx, docker-compose
-├── AGENTS.md                    # Guía para asistentes IA
-└── DESIGN.md                    # Documentación de arquitectura
+│   │   ├── UserManagement.Domain/       # Entidades, Value Objects, Enums (0 dependencias externas)
+│   │   ├── UserManagement.Application/  # CQRS, Interfaces, Validación FluentValidation
+│   │   ├── UserManagement.Infrastructure/ # EF Core Configurations, JWT, Email, Repositories
+│   │   └── UserManagement.WebApi/       # Controllers, Middleware, Program.cs, Filters
+│   ├── frontend/                       # React 19 + Vite 8
+│   │   ├── src/stores/                 # Zustand (auth-store)
+│   │   ├── src/lib/                    # API client (Axios), utils
+│   │   ├── src/components/ui/          # shadcn/ui v4 primitives
+│   │   ├── src/components/layout/      # Layout, Sidebar, Header
+│   │   ├── src/components/auth/        # Auth guards (SessionWarning)
+│   │   └── src/pages/                  # Login, Dashboard, Users, Roles, Permissions...
+│   └── docker/                         # Dockerfiles, nginx.conf, docker-compose.yml
+├── tests/
+│   ├── UserManagement.Application.Tests/  # Unit tests — servicios, validadores
+│   └── UserManagement.WebApi.Tests/       # Controller tests
 ```
+
+## API Endpoints
+
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| POST | `/api/auth/login` | Inicio de sesión | No |
+| POST | `/api/auth/refresh` | Refrescar token JWT | Refresh |
+| POST | `/api/auth/change-password` | Cambiar contraseña | JWT |
+| POST | `/api/auth/forgot-password` | Solicitar restablecimiento | No |
+| POST | `/api/auth/reset-password` | Restablecer contraseña | Token |
+| POST | `/api/auth/logout` | Cerrar sesión | JWT |
+| GET | `/api/users` | Listar usuarios (paginado) | JWT |
+| GET | `/api/users/{id}` | Obtener usuario | JWT |
+| POST | `/api/users` | Crear usuario | JWT |
+| PUT | `/api/users/{id}` | Actualizar usuario | JWT |
+| DELETE | `/api/users/{id}` | Eliminar usuario (soft) | JWT |
+| GET | `/api/roles` | Listar roles | JWT |
+| GET | `/api/roles/{id}` | Obtener rol con permisos | JWT |
+| POST | `/api/roles` | Crear rol | JWT |
+| PUT | `/api/roles/{id}` | Actualizar rol | JWT |
+| DELETE | `/api/roles/{id}` | Eliminar rol | JWT |
+| GET | `/api/permissions` | Listar permisos | JWT |
+| GET | `/api/dashboard/stats` | Estadísticas del dashboard | JWT |
+| GET | `/scalar/v1` | Documentación interactiva API | No |
+
+## Características de seguridad
+
+- **JWT HS512** — Tokens de acceso de 15 min + refresh token de 7 días con rotación
+- **Refresh Rotation** — Cada refresh invalida el token anterior; detecta reuso y revoca todas las sesiones
+- **Rate Limiting** — 10 req/min en login, 3 req/h en forgot-password, 100 req/min global
+- **Security Headers** — CSP, X-Frame-Options, X-Content-Type-Options, XSS-Protection, Referrer-Policy, Permissions-Policy
+- **PBKDF2** — 100,000 iteraciones para hash de contraseñas (Rfc2898DeriveBytes)
+- **Cuentas bloqueadas** — 5 intentos fallidos → bloqueo 15 min (HTTP 423)
+- **Validación de contraseñas** — Servicio centralizado `PasswordPolicyService` con configuración vía `appsettings.json`
+
+## Seed Data
+
+Al iniciar por primera vez, el seeder crea:
+- **22 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil
+- **5 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c
+- **Usuario admin**: `admin` / `admin` (SuperAdmin — se exige cambiar contraseña en primer ingreso)
+
+## Testing
+
+```bash
+# Ejecutar todos los tests
+dotnet test UserManagement.slnx
+
+# Ejecutar tests con cobertura
+dotnet test UserManagement.slnx --collect:"XPlat Code Coverage"
+
+# Tests por capa
+dotnet test tests/UserManagement.Application.Tests
+dotnet test tests/UserManagement.WebApi.Tests
+```
+
+Los tests siguen el patrón `[Clase]_[Método]_[Escenario]_[ResultadoEsperado]` con xUnit + Moq + FluentAssertions.
+
+## Documentación de arquitectura
+
+Ver [`DESIGN.md`](./DESIGN.md) para Architecture Decision Records (ADRs) detallados con contexto, opciones consideradas, decisión y trade-offs de cada elección técnica.
+
+Ver [`AGENTS.md`](./AGENTS.md) para guías de workflow multi-agente.
 
 ## Variables de entorno
 
