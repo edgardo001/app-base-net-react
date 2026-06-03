@@ -38,14 +38,22 @@ cp .env.template .env
 # Editar .env con valores reales
 # La clave JWT debe tener al menos 64 caracteres
 
-# 2. Iniciar PostgreSQL (opcional, si no tienes local)
+# 2. Configurar secretos locales (nunca en appsettings.json)
+dotnet user-secrets init --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Email:Smtp:Host" "smtp.gmail.com" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Email:Smtp:Username" "tu-email@gmail.com" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Email:Smtp:Password" "tu-passphrase" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Email:FromEmail" "tu-email@gmail.com" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "FrontendUrl" "http://localhost:5173" --project src/backend/AppBaseNetReact.WebApi
+
+# 3. Iniciar PostgreSQL (opcional, si no tienes local)
 docker compose -f src/docker/docker-compose.yml up postgres -d
 
-# 3. Backend (http://localhost:5011)
+# 4. Backend (http://localhost:5011)
 dotnet build AppBaseNetReact.slnx
 dotnet run --project src/backend/AppBaseNetReact.WebApi
 
-# 4. Frontend (http://localhost:5173)
+# 5. Frontend (http://localhost:5173)
 cd src/frontend
 npm install
 npm run dev
@@ -188,16 +196,24 @@ Ver [`AGENTS.md`](./AGENTS.md) para guías de workflow multi-agente.
 
 ## Variables de entorno
 
-| Variable | Descripción |
-|----------|-------------|
-| `ConnectionStrings__PostgreSQL` | Cadena de conexión PostgreSQL |
-| `Jwt__SecretKey` | Clave JWT (mínimo 64 caracteres para HS512) |
-| `Jwt__Issuer` | Emisor del token |
-| `Jwt__Audience` | Audiencia del token |
-| `Captcha__SiteKey` | Cloudflare Turnstile Site Key |
-| `Captcha__SecretKey` | Cloudflare Turnstile Secret Key |
-| `Email__Smtp__Username` | Usuario SMTP |
-| `Email__Smtp__Password` | Contraseña SMTP |
+> ⚠️ **Datos sensibles y específicos del entorno nunca van en `appsettings.json`.**  
+> Usar `dotnet user-secrets` en local o variables de entorno en Docker/despliegue.
+
+| Variable | Descripción | Requerida |
+|----------|-------------|-----------|
+| `ConnectionStrings__PostgreSQL` | Cadena de conexión PostgreSQL | Sí |
+| `Jwt__SecretKey` | Clave JWT (mínimo 64 caracteres para HS512) | Sí |
+| `Jwt__Issuer` | Emisor del token | Sí |
+| `Jwt__Audience` | Audiencia del token | Sí |
+| `Captcha__SiteKey` | Cloudflare Turnstile Site Key | No |
+| `Captcha__SecretKey` | Cloudflare Turnstile Secret Key | No |
+| `Email__Smtp__Host` | Servidor SMTP (ej: `smtp.gmail.com`) | Sí |
+| `Email__Smtp__Port` | Puerto SMTP (default: `587`) | No |
+| `Email__Smtp__Username` | Usuario SMTP | Sí |
+| `Email__Smtp__Password` | Contraseña o app password SMTP | Sí |
+| `Email__FromEmail` | Dirección remitente | Sí |
+| `Email__FromName` | Nombre remitente (default: `Sistema Gestión Usuarios`) | No |
+| `FrontendUrl` | URL del frontend para enlaces en correos (ej: `http://localhost:5173`) | Sí |
 
 ## Comandos principales
 
