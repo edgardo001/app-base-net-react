@@ -51,6 +51,53 @@ npm install
 npm run dev
 ```
 
+## Diagrama de Arquitectura
+
+> ⚠️ **Este diagrama debe mantenerse actualizado.** Cada vez que se modifique la estructura de capas, dependencias entre proyectos, o el flujo de ejecución, actualizar este diagrama en `README.md` y `AGENTS.md`.
+
+### Dependencias entre Capas
+
+```mermaid
+graph TD
+    subgraph WebApi["WebApi (Presentación)"]
+        Controllers["Controllers<br/>(Auth, Users, Roles, etc.)"]
+    end
+
+    subgraph Application["Application (Casos de Uso)"]
+        Ports["🔌 Puertos (Interfaces)<br/>IRepository, IUnitOfWork<br/>IJwtService, IPasswordHasher"]
+        CQRS["📁 CQRS Estructural<br/>Commands/ Queries/<br/>Handlers (pendiente)"]
+    end
+
+    subgraph Domain["Domain (Núcleo)"]
+        Entities["Entities<br/>User, Role, Permission<br/>RefreshToken, AuditLog"]
+    end
+
+    subgraph Infrastructure["Infrastructure (Adaptadores)"]
+        Repos["Repositorios EF Core"]
+        UoW["UnitOfWork"]
+        Jwt["JwtService / Hasher"]
+        DbCtx["AppDbContext → PostgreSQL"]
+    end
+
+    WebApi --> Application
+    WebApi --> Infrastructure
+    Infrastructure --> Application
+    Infrastructure --> Domain
+    Application --> Domain
+    Domain -->|"0 dependencias externas"| .Empty
+
+    Infrastructure -.->|"Implementa"| Ports
+```
+
+### Flujo Actual vs Target
+
+| Fase | ¿Quién orquesta? | ¿Dónde? |
+|------|-----------------|---------|
+| ⚡ **Actual** | Controller (via `IUnitOfWork`) | `WebApi/Controllers/*Controller.cs` |
+| 🎯 **Target** | CQRS Handler (via MediatR) | `Application/Features/*/Commands|Queries/*Handler.cs` |
+
+Actualmente los **Controllers** inyectan `IUnitOfWork` + servicios y ejecutan la lógica directamente. La carpeta `Application/Features/` tiene la estructura CQRS lista pero los handlers están vacíos — ese es el target arquitectónico.
+
 ## Estructura del proyecto
 
 ```

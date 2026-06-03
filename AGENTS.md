@@ -49,7 +49,133 @@ dotnet ef migrations add <Name> -p src/backend/AppBaseNetReact.Infrastructure -s
 dotnet ef database update -p src/backend/AppBaseNetReact.Infrastructure -s src/backend/AppBaseNetReact.WebApi
 ```
 
-## Architecture Rules
+## Diagrama de Arquitectura — Dependencias y Flujo de Ejecución
+
+> ⚠️ **Este diagrama debe mantenerse actualizado.** Cada vez que se modifique la estructura de capas, dependencias entre proyectos, o el flujo de ejecución (ej: agregar un handler CQRS, cambiar un puerto, añadir un adaptador), el desarrollador debe actualizar este diagrama en `AGENTS.md` y `README.md`.
+
+### Dependencias entre Capas (Project References)
+
+```mermaid
+graph TD
+    subgraph WebApi["WebApi (Presentación)"]
+        Controllers["Controllers<br/>(Auth, Users, Roles, etc.)"]
+        Middleware["Middleware"]
+        Filters["Filters / ApiResponse"]
+    end
+
+    subgraph Application["Application (Casos de Uso)"]
+        direction TB
+        subgraph Ports["🔌 Puertos (Interfaces)"]
+            IRepo["IRepository&lt;T&gt;<br/>IUserRepository<br/>IRoleRepository<br/>..."]
+            ISvc["IJwtService<br/>IPasswordHasherService<br/>IEmailService<br/>..."]
+            IUoW["IUnitOfWork"]
+        end
+        subgraph CQRS["📁 CQRS (Estructural — Pendiente)"]
+            Cmds["Commands/"]
+            Qrys["Queries/"]
+            Handlers["Handlers<br/>(a implementar)"]
+            Validators["FluentValidation<br/>Validators"]
+        end
+        Behaviors["MediatR Pipeline<br/>ValidationBehavior"]
+    end
+
+    subgraph Domain["Domain (Núcleo)"]
+        Entities["Entities<br/>User, Role, Permission<br/>RefreshToken, AuditLog"]
+        Base["BaseEntity<br/>(Audit, Soft-Delete)"]
+    end
+
+    subgraph Infrastructure["Infrastructure (Adaptadores)"]
+        direction TB
+        Repos["Repositories<br/>UserRepository<br/>RoleRepository<br/>... (EF Core)"]
+        UnitOfWork["UnitOfWork"]
+        Jwt["JwtService<br/>(HS512)"]
+        Hasher["PasswordHasherService<br/>(PBKDF2)"]
+        DbCtx["AppDbContext<br/>(EF Core 10, PostgreSQL 18)"]
+        Migrations["Migrations"]
+    end
+
+    subgraph External["🧩 Sistemas Externos"]
+        PG["PostgreSQL 18"]
+    end
+
+    %% Project reference dependencies (build-time)
+    WebApi -->|"ProjectReference"| Application
+    WebApi -->|"ProjectReference"| Infrastructure
+    Infrastructure -->|"ProjectReference"| Application
+    Infrastructure -->|"ProjectReference"| Domain
+    Application -->|"ProjectReference"| Domain
+
+    %% Domain: zero external dependencies
+    Domain -->|"❌ 0 dependencias<br/>(solo MediatR.Contracts)"| .EmptyDomain
+
+    %% Port/Adapter bindings (DI registrations)
+    Infrastructure -.->|"🔌 Implementa"| Ports
+    Ports -.->|"📐 Define contratos"| Infrastructure
+
+    %% Data flow
+    DbCtx --> PG
+    Repos --> DbCtx
+    UnitOfWork --> Repos
+    Jwt -->|"GenerateAccessToken"| Controllers
+    Hasher -->|"Hash/Verify"| Controllers
+```
+
+### Flujo de Ejecución — Situación Actual vs Target
+
+```mermaid
+graph LR
+    subgraph Legend["Leyenda"]
+        L1["⚡ Actual (controladores orquestan)"]
+        L2["🎯 Target (CQRS con handlers)"]
+        L3["🟢 Ambos flujos coexisten"]
+    end
+
+    subgraph Client["Cliente HTTP"]
+        Req["Request<br/>POST /api/auth/login"]
+    end
+
+    subgraph Current["⚡ FLUJO ACTUAL"]
+        direction TB
+        C1["Controller<br/>AuthController.Login"]
+        C2["IUnitOfWork.Users<br/>.GetByEmailAsync()"]
+        C3["User entity<br/>MarkLogin(), LockUntil()<br/>IncrementFailedAccess()"]
+        C4["IUnitOfWork<br/>.SaveChangesAsync()"]
+        C5["IJwtService<br/>.GenerateAccessToken()"]
+        C6["ApiResponse&lt;T&gt;<br/>return Ok/Fail"]
+        C1 --> C2 --> C3 --> C4 --> C5 --> C6
+    end
+
+    subgraph Target["🎯 FLUJO TARGET (CQRS)"]
+        direction TB
+        T1["Controller<br/>AuthController.Login"]
+        T2["MediatR.Send<br/>(LoginCommand)"]
+        T3["ValidationBehavior<br/>(FluentValidation)"]
+        T4["LoginCommandHandler<br/>.Handle()"]
+        T5["IUnitOfWork<br/>+ IJwtService"]
+        T6["ApiResponse&lt;T&gt;<br/>return Ok/Fail"]
+        T1 --> T2 --> T3 --> T4 --> T5 --> T6
+    end
+
+    Req -->|"⚡"| Current
+    Req -->|"🎯"| Target
+
+    style Legend fill:#f5f5f5,stroke:#999
+    style Current fill:#fff3cd,stroke:#ffc107
+    style Target fill:#d4edda,stroke:#28a745
+```
+
+### ¿Dónde ocurre la acción?
+
+| Aspecto | ¿Dónde está ahora? | ¿Dónde debería estar (CQRS)? |
+|---------|-------------------|------------------------------|
+| **Orquestación de negocio** | `Controllers/AuthController.cs:39` — método `Login()` | `Application/Features/Auth/Commands/LoginCommandHandler.cs` |
+| **Validación de input** | `Application/Common/Validators/AuthValidators.cs` | Mismo lugar ✅ |
+| **Lógica de dominio** | `Domain/Entities/User.cs` — `MarkLogin()`, `LockUntil()`, etc. | Mismo lugar ✅ (invocado desde el handler) |
+| **Persistencia** | `Infrastructure/Persistence/Repositories/` + `UnitOfWork` | Mismo lugar ✅ |
+| **Pipeline de validación** | No activo (no hay handlers MediatR) | `Application/Common/Behaviors/ValidationBehavior.cs` |
+| **DTOs/Response** | Definidos inline en cada controller | `Application/Features/Auth/Commands/LoginResponse.cs` |
+
+### Reglas Arquitectónicas
 - **Domain:** Zero external dependencies
 - **Application:** Only depends on Domain + NuGet (MediatR, FluentValidation, AutoMapper)
 - **Infrastructure:** Implements Application interfaces, depends on Domain
