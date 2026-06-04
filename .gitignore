@@ -10,6 +10,8 @@ obj/
 *.userprefs
 packages/
 *.nupkg
+appsettings.json
+appsettings.Development.json
 
 # Node
 node_modules/
