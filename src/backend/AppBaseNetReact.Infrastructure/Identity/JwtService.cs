@@ -44,6 +44,11 @@ public class JwtService : IJwtService
             claims.Add(new Claim("permission", permission));
         }
 
+        foreach (var userRole in user.UserRoles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
+        }
+
         var token = new JwtSecurityToken(
             issuer: _settings.Issuer,
             audience: _settings.Audience,
