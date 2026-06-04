@@ -9,6 +9,7 @@ using AppBaseNetReact.Domain.Entities;
 using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Filters;
+using Serilog;
 
 namespace AppBaseNetReact.WebApi.Controllers;
 
@@ -236,10 +237,17 @@ public class AuthController : ControllerBase
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             Request.Headers.UserAgent.ToString(), null, ct);
 
-        await SendEmail(user, "PasswordChanged", new Dictionary<string, string>
+        try
         {
-            ["UserName"] = user.FirstName
-        }, ct);
+            await SendEmail(user, "PasswordChanged", new Dictionary<string, string>
+            {
+                ["UserName"] = user.FirstName
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to send password change email for user {UserId}", userId);
+        }
 
         return Ok(ApiResponse<object>.Ok(null, "Password changed successfully"));
     }
