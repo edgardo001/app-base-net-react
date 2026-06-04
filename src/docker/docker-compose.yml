@@ -95,6 +95,12 @@ services:
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.backend.loadbalancer.server.port=8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
     deploy:
       resources:
@@ -108,7 +114,8 @@ services:
       dockerfile: src/docker/Dockerfile.frontend
     container_name: mvp-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - mvp-network
       - traefik-net
