@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Activity, ShieldAlert, RefreshCw } from 'lucide-react'
+import { Activity, ShieldAlert, RefreshCw, Mail, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface AuditEntry {
   action: string
@@ -19,6 +21,8 @@ export function AdminPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [testEmail, setTestEmail] = useState('')
+  const [sending, setSending] = useState(false)
 
   const fetchAudit = async () => {
     setLoading(true)
@@ -36,9 +40,26 @@ export function AdminPage() {
     if (!confirm('¿Revocar todos los tokens de sesión? Todos los usuarios serán desconectados.')) return
     try {
       await api.post('/admin/revoke-all-tokens')
-      alert('Todas las sesiones han sido revocadas')
+      toast.success('Todas las sesiones han sido revocadas')
       fetchAudit()
     } catch { /* ignore */ }
+  }
+
+  const sendTestEmail = async () => {
+    if (!testEmail.trim()) {
+      toast.error('Ingresa un correo electrónico')
+      return
+    }
+    setSending(true)
+    try {
+      await api.post('/admin/test-email', { to: testEmail.trim() })
+      toast.success('Correo de prueba enviado correctamente')
+      setTestEmail('')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al enviar correo de prueba'
+      toast.error(msg)
+    }
+    setSending(false)
   }
 
   const totalPages = Math.ceil(total / 20)
@@ -51,6 +72,30 @@ export function AdminPage() {
           <ShieldAlert className="mr-2 h-4 w-4" /> Revocar Todas las Sesiones
         </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" /> Correo de Prueba
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            <Input
+              type="email"
+              placeholder="correo@ejemplo.com"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              disabled={sending}
+              className="max-w-sm"
+            />
+            <Button onClick={sendTestEmail} disabled={sending}>
+              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+              Enviar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
