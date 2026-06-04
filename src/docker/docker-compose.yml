@@ -78,10 +78,13 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE:-mvp-usuarios-api}
       Captcha__SiteKey: ${CAPTCHA_SITE_KEY:-}
       Captcha__SecretKey: ${CAPTCHA_SECRET_KEY:-}
-      Email__Smtp__Host: ${SMTP_HOST:-}
+      Email__Provider: ${SMTP_PROVIDER:-Smtp}
+      Email__FromName: ${SMTP_FROM_NAME:-Sistema Gestión Usuarios}
+      Email__FromEmail: ${SMTP_FROM_EMAIL:?Debe definir SMTP_FROM_EMAIL en .env}
+      Email__Smtp__Host: ${SMTP_HOST:?Debe definir SMTP_HOST en .env}
       Email__Smtp__Port: ${SMTP_PORT:-587}
-      Email__Smtp__Username: ${SMTP_USERNAME:-}
-      Email__Smtp__Password: ${SMTP_PASSWORD:-}
+      Email__Smtp__Username: ${SMTP_USERNAME:?Debe definir SMTP_USERNAME en .env}
+      Email__Smtp__Password: ${SMTP_PASSWORD:?Debe definir SMTP_PASSWORD en .env}
     depends_on:
       postgres:
         condition: service_healthy
