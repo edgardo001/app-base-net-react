@@ -9,26 +9,34 @@
 # =============================================================================
 
 services:
-  # Traefik desactivado — se usa una instancia externa existente
   # traefik:
-  #   image: traefik:v3.3
+  #   image: traefik:v3.7.1
   #   container_name: traefik
-  #   command:
-  #     - "--providers.docker=true"
-  #     - "--providers.docker.exposedbydefault=false"
-  #     - "--entrypoints.websecure.address=:443"
-  #     - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-  #     - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
-  #     - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-  #     - "--api.dashboard=false"
-  #   ports:
-  #     - "443:443"
-  #   volumes:
-  #     - "/var/run/docker.sock:/var/run/docker.sock:ro"
-  #     - "traefik-letsencrypt:/letsencrypt"
-  #   networks:
-  #     - mvp-network
   #   restart: unless-stopped
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   networks:
+  #     - traefik-net
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   environment:
+  #     - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - ./traefik.yml:/etc/traefik/traefik.yml:ro
+  #     - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+  #     - ./data/acme.json:/etc/traefik/acme/acme.json
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.traefik.entrypoints=websecure"
+  #     - "traefik.http.routers.traefik.rule=Host(`traefik.edgardovasquez.cl`)"
+  #     - "traefik.http.routers.traefik.tls=true"
+  #     - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+  #     - "traefik.http.routers.traefik.service=api@internal"
+  #     - "traefik.http.routers.traefik.middlewares=auth"
+  #     - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_PASS_HASH?Variable TRAEFIK_PASS_HASH no definida}"
+
 
   # --- Base de datos PostgreSQL 18 ---
   postgres:
