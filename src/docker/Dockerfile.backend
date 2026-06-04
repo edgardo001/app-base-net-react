@@ -1,5 +1,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
+ENV NUGET_FALLBACK_PACKAGES=
 WORKDIR /src
 
 # Layer 1: restore con cache de NuGet (solo cambia si .csproj cambia)
@@ -7,6 +8,7 @@ COPY ["src/backend/AppBaseNetReact.Domain/AppBaseNetReact.Domain.csproj", "backe
 COPY ["src/backend/AppBaseNetReact.Application/AppBaseNetReact.Application.csproj", "backend/AppBaseNetReact.Application/"]
 COPY ["src/backend/AppBaseNetReact.Infrastructure/AppBaseNetReact.Infrastructure.csproj", "backend/AppBaseNetReact.Infrastructure/"]
 COPY ["src/backend/AppBaseNetReact.WebApi/AppBaseNetReact.WebApi.csproj", "backend/AppBaseNetReact.WebApi/"]
+COPY ["nuget.config", "."]
 RUN dotnet restore "backend/AppBaseNetReact.WebApi/AppBaseNetReact.WebApi.csproj"
 
 # Layer 2: build y publish
