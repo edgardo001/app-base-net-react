@@ -231,7 +231,9 @@ dotnet ef migrations add <Nombre> --project src/backend/AppBaseNetReact.Infrastr
 dotnet ef database update --project src/backend/AppBaseNetReact.Infrastructure --startup-project src/backend/AppBaseNetReact.WebApi
 
 # Docker (full stack con Traefik)
+docker compose -f src/docker/docker-compose.yml --env-file .env build  # Construir todas las imágenes
 docker compose -f src/docker/docker-compose.yml --env-file .env up -d
+docker compose -f src/docker/docker-compose.yml --env-file .env down   # Detener todos los servicios
 ```
 
 ## Despliegue
