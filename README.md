@@ -234,6 +234,7 @@ dotnet ef database update --project src/backend/AppBaseNetReact.Infrastructure -
 docker compose -f src/docker/docker-compose.yml --env-file .env build  # Construir todas las imágenes
 docker compose -f src/docker/docker-compose.yml --env-file .env up -d
 docker compose -f src/docker/docker-compose.yml --env-file .env down   # Detener todos los servicios
+docker compose -f src/docker/docker-compose.yml --env-file .env down --volumes  # Detener + borrar volúmenes y redes (BD incluida)
 ```
 
 ## Despliegue
