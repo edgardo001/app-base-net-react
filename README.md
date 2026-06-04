@@ -246,6 +246,21 @@ Dominios por defecto (configurables en `.env`):
 - Backend: (configurar dominio en producción)
 - Frontend: (configurar dominio en producción)
 
+### VPS con 1vCPU / 1GB RAM
+
+Compilar .NET 10 en un VPS de 1GB RAM puede agotar la memoria y ralentizar el build. Se recomienda agregar swap:
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+# Persistente al reinicio:
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+Para verificar: `swapon --show` o `free -h`.
+
 ## Seed Data
 
 Al iniciar por primera vez, el seeder crea:
