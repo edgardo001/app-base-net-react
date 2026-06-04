@@ -242,6 +242,12 @@ El archivo `src/docker/docker-compose.yml` levanta:
 3. **Backend** — .NET 10 Web API
 4. **Frontend** — React SPA servido por Nginx
 
+Para desplegar:
+
+```bash
+docker compose --env-file .env -f src/docker/docker-compose.yml up -d --build
+```
+
 Dominios por defecto (configurables en `.env`):
 - Backend: (configurar dominio en producción)
 - Frontend: (configurar dominio en producción)
