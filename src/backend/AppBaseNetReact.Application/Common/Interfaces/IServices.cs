@@ -17,6 +17,9 @@ public interface IPasswordHasherService
 public interface IEmailService
 {
     Task SendEmailAsync(string to, string subject, string htmlBody, CancellationToken ct = default);
+    Task SendAccountLockedEmailAsync(string to, string userName, int lockoutMinutes, string resetLink, CancellationToken ct = default);
+    Task SendPasswordChangedEmailAsync(string to, string userName, CancellationToken ct = default);
+    Task SendWelcomeEmailAsync(string to, string userName, string loginLink, CancellationToken ct = default);
 }
 
 public interface ICaptchaService

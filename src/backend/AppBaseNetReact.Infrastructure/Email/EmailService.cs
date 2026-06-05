@@ -73,4 +73,64 @@ public class EmailService : IEmailService
 
         return message;
     }
+
+    public async Task SendAccountLockedEmailAsync(
+        string to, string userName, int lockoutMinutes, string resetLink, CancellationToken ct = default)
+    {
+        if (!_options.Templates.TryGetValue("AccountLocked", out var config))
+        {
+            _logger.LogWarning("AccountLocked template not configured; skipping email to {To}", to);
+            return;
+        }
+
+        var vars = new Dictionary<string, string>
+        {
+            ["UserName"] = userName,
+            ["LockoutMinutes"] = lockoutMinutes.ToString(),
+            ["ResetLink"] = resetLink,
+            ["Year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+        await SendEmailAsync(to, config.Subject, htmlBody, ct);
+    }
+
+    public async Task SendPasswordChangedEmailAsync(
+        string to, string userName, CancellationToken ct = default)
+    {
+        if (!_options.Templates.TryGetValue("PasswordChanged", out var config))
+        {
+            _logger.LogWarning("PasswordChanged template not configured; skipping email to {To}", to);
+            return;
+        }
+
+        var vars = new Dictionary<string, string>
+        {
+            ["UserName"] = userName,
+            ["Year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+        await SendEmailAsync(to, config.Subject, htmlBody, ct);
+    }
+
+    public async Task SendWelcomeEmailAsync(
+        string to, string userName, string loginLink, CancellationToken ct = default)
+    {
+        if (!_options.Templates.TryGetValue("Welcome", out var config))
+        {
+            _logger.LogWarning("Welcome template not configured; skipping email to {To}", to);
+            return;
+        }
+
+        var vars = new Dictionary<string, string>
+        {
+            ["UserName"] = userName,
+            ["LoginLink"] = loginLink,
+            ["Year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+        await SendEmailAsync(to, config.Subject, htmlBody, ct);
+    }
 }
