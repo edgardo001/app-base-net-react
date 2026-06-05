@@ -1,16 +1,19 @@
 using FluentAssertions;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using System.Security.Claims;
-using AppBaseNetReact.Application.Common.Interfaces;
+using AppBaseNetReact.Application.Common.Models;
 using AppBaseNetReact.Application.Common.Validators;
-using AppBaseNetReact.Domain.Entities;
-using AppBaseNetReact.Infrastructure.Email;
-using AppBaseNetReact.Infrastructure.Services;
+using AppBaseNetReact.Application.Features.Auth.Commands.ChangePassword;
+using AppBaseNetReact.Application.Features.Auth.Commands.ConfirmEmail;
+using AppBaseNetReact.Application.Features.Auth.Commands.ForgotPassword;
+using AppBaseNetReact.Application.Features.Auth.Commands.Login;
+using AppBaseNetReact.Application.Features.Auth.Commands.Logout;
+using AppBaseNetReact.Application.Features.Auth.Commands.Refresh;
+using AppBaseNetReact.Application.Features.Auth.Commands.ResetPassword;
 using AppBaseNetReact.WebApi.Controllers;
 using AppBaseNetReact.WebApi.Filters;
 
@@ -18,37 +21,13 @@ namespace AppBaseNetReact.WebApi.Tests.Controllers;
 
 public class AuthControllerTests
 {
-    private readonly Mock<IUnitOfWork> _uow = new();
-    private readonly Mock<IJwtService> _jwt = new();
-    private readonly Mock<IPasswordHasherService> _hasher = new();
-    private readonly Mock<IAuditService> _audit = new();
-    private readonly Mock<IPasswordPolicyService> _passwordPolicy = new();
-    private readonly Mock<IEmailService> _email = new();
-    private readonly Mock<ILogger<EmailService>> _logger = new();
-    private readonly EmailRenderer _renderer = new();
-    private readonly EmailOptions _emailOptions = new()
-    {
-        Templates = new Dictionary<string, EmailTemplateConfig>
-        {
-            ["PasswordReset"] = new() { Subject = "Reset", TemplateFile = "password-reset.html" },
-            ["PasswordChanged"] = new() { Subject = "Changed", TemplateFile = "password-changed.html" },
-            ["Welcome"] = new() { Subject = "Welcome", TemplateFile = "welcome.html" },
-            ["AccountLocked"] = new() { Subject = "Locked", TemplateFile = "account-locked.html" }
-        }
-    };
+    private readonly Mock<IMediator> _mediator = new();
 
     private readonly AuthController _controller;
     private readonly Guid _userId = Guid.NewGuid();
 
     public AuthControllerTests()
     {
-        var clock = new Mock<IDateTimeProvider>();
-        clock.Setup(x => x.UtcNow).Returns(DateTime.UtcNow);
-
-        _passwordPolicy.Setup(x => x.MaxFailedAccessAttempts).Returns(5);
-        _passwordPolicy.Setup(x => x.DefaultLockoutMinutes).Returns(15);
-        _passwordPolicy.Setup(x => x.Validate(It.IsAny<string>())).Returns((true, ""));
-
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -56,17 +35,7 @@ public class AuthControllerTests
             })
             .Build();
 
-        _controller = new AuthController(
-            _jwt.Object,
-            _hasher.Object,
-            _uow.Object,
-            clock.Object,
-            _audit.Object,
-            _passwordPolicy.Object,
-            _email.Object,
-            _renderer,
-            Options.Create(_emailOptions),
-            config);
+        _controller = new AuthController(_mediator.Object, config);
 
         var claims = new[] { new Claim("sub", _userId.ToString()) };
         _controller.ControllerContext = new ControllerContext
@@ -74,17 +43,17 @@ public class AuthControllerTests
             HttpContext = new DefaultHttpContext
             {
                 User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test")),
-                Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1") }
+                Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1") },
+                Request = { Scheme = "http", Host = new HostString("localhost:5173") }
             }
         };
     }
 
     [Fact]
-    public async Task ForgotPassword_WithValidEmail_SendsEmailAndReturnsGenericMessage()
+    public async Task ForgotPassword_AlwaysReturnsGenericMessage()
     {
-        var user = User.Create("test@test.com", "hash", "Test", "User", Guid.NewGuid());
-        _uow.Setup(x => x.Users.GetByEmailAsync("test@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<ForgotPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ForgotPasswordOutcome(PasswordResult.Success()));
 
         var result = await _controller.ForgotPassword(
             new ForgotPasswordRequest("test@test.com"), CancellationToken.None);
@@ -93,51 +62,31 @@ public class AuthControllerTests
         var response = ok.Value.Should().BeOfType<ApiResponse<object>>().Subject;
         response.Success.Should().BeTrue();
         response.Data.Should().BeNull();
-        _email.Verify(x => x.SendEmailAsync(
-            user.Email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        _mediator.Verify(x => x.Send(
+            It.Is<ForgotPasswordCommand>(c => c.Email == "test@test.com" && c.IpAddress == "127.0.0.1"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ForgotPassword_WithUnregisteredEmail_ReturnsGenericMessage()
+    public async Task ForgotPassword_SendsCommandEvenForUnknownEmail()
     {
-        _uow.Setup(x => x.Users.GetByEmailAsync("unknown@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<ForgotPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ForgotPasswordOutcome(PasswordResult.Success()));
 
         var result = await _controller.ForgotPassword(
             new ForgotPasswordRequest("unknown@test.com"), CancellationToken.None);
 
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var response = ok.Value.Should().BeOfType<ApiResponse<object>>().Subject;
-        response.Success.Should().BeTrue();
-        response.Data.Should().BeNull();
-        _email.Verify(x => x.SendEmailAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+        result.Should().BeOfType<OkObjectResult>();
+        _mediator.Verify(x => x.Send(
+            It.Is<ForgotPasswordCommand>(c => c.Email == "unknown@test.com"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ForgotPassword_WithValidEmail_DoesNotReturnTempPassword()
+    public async Task ConfirmEmail_WithSuccessOutcome_Returns200()
     {
-        var user = User.Create("test@test.com", "hash", "Test", "User", Guid.NewGuid());
-        _uow.Setup(x => x.Users.GetByEmailAsync("test@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-
-        var result = await _controller.ForgotPassword(
-            new ForgotPasswordRequest("test@test.com"), CancellationToken.None);
-
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var response = ok.Value.Should().BeOfType<ApiResponse<object>>().Subject;
-        response.Data.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task ConfirmEmail_WithValidToken_ConfirmsAndSendsWelcome()
-    {
-        var user = User.Create("test@test.com", "hash", "Test", "User", Guid.NewGuid());
-        user.SetEmailConfirmationToken("valid-token", DateTime.UtcNow.AddHours(24));
-        _uow.Setup(x => x.Users.GetByEmailConfirmationTokenAsync("valid-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<ConfirmEmailCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConfirmEmailOutcome(EmailConfirmationResult.Success()));
 
         var result = await _controller.ConfirmEmail(
             new ConfirmEmailRequest("valid-token"), CancellationToken.None);
@@ -145,38 +94,369 @@ public class AuthControllerTests
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = ok.Value.Should().BeOfType<ApiResponse<object>>().Subject;
         response.Success.Should().BeTrue();
-        user.EmailConfirmed.Should().BeTrue();
-        _email.Verify(x => x.SendEmailAsync(
-            user.Email, "Welcome", It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        _mediator.Verify(x => x.Send(
+            It.Is<ConfirmEmailCommand>(c =>
+                c.Token == "valid-token" &&
+                c.LoginLink == "http://localhost:5173/login" &&
+                c.IpAddress == "127.0.0.1"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ConfirmEmail_WithExpiredToken_ReturnsBadRequest()
+    public async Task ConfirmEmail_WithExpiredToken_Returns400()
     {
-        var user = User.Create("test@test.com", "hash", "Test", "User", Guid.NewGuid());
-        user.SetEmailConfirmationToken("expired-token", DateTime.UtcNow.AddHours(-1));
-        _uow.Setup(x => x.Users.GetByEmailConfirmationTokenAsync("expired-token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<ConfirmEmailCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConfirmEmailOutcome(
+                EmailConfirmationResult.Fail(EmailErrorCode.ConfirmationTokenExpired, "Confirmation token has expired")));
 
         var result = await _controller.ConfirmEmail(
             new ConfirmEmailRequest("expired-token"), CancellationToken.None);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
-        var badRequest = result as BadRequestObjectResult;
-        var response = badRequest!.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var response = bad.Value.Should().BeOfType<ApiResponse<object>>().Subject;
         response.Success.Should().BeFalse();
     }
 
     [Fact]
-    public async Task ConfirmEmail_WithInvalidToken_ReturnsBadRequest()
+    public async Task ConfirmEmail_WithInvalidToken_Returns400()
     {
-        _uow.Setup(x => x.Users.GetByEmailConfirmationTokenAsync("invalid", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<ConfirmEmailCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConfirmEmailOutcome(
+                EmailConfirmationResult.Fail(EmailErrorCode.InvalidConfirmationToken, "Invalid confirmation token")));
 
         var result = await _controller.ConfirmEmail(
             new ConfirmEmailRequest("invalid"), CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithSuccessOutcome_Returns200()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ChangePasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChangePasswordOutcome(PasswordResult.Success()));
+
+        var result = await _controller.ChangePassword(
+            new ChangePasswordRequest("current", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.StatusCode.Should().Be(200);
+        _mediator.Verify(x => x.Send(
+            It.Is<ChangePasswordCommand>(c =>
+                c.UserId == _userId &&
+                c.CurrentPassword == "current" &&
+                c.NewPassword == "new-pwd" &&
+                c.IpAddress == "127.0.0.1"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithInvalidCurrentPassword_Returns400()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ChangePasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChangePasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.InvalidCurrentPassword, "Current password is incorrect")));
+
+        var result = await _controller.ChangePassword(
+            new ChangePasswordRequest("wrong", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithWeakNewPassword_Returns400WithMessage()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ChangePasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChangePasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.WeakPassword, "Password too short")));
+
+        var result = await _controller.ChangePassword(
+            new ChangePasswordRequest("current", "weak", "weak"), CancellationToken.None);
+
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var response = bad.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Message.Should().Be("Password too short");
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithUserNotFound_Returns404()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ChangePasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChangePasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.UserNotFound, "User not found")));
+
+        var result = await _controller.ChangePassword(
+            new ChangePasswordRequest("current", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithoutSubClaim_Returns401()
+    {
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity()),
+                Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1") }
+            }
+        };
+
+        var result = await _controller.ChangePassword(
+            new ChangePasswordRequest("current", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedResult>();
+        _mediator.Verify(x => x.Send(It.IsAny<ChangePasswordCommand>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithSuccessOutcome_Returns200()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ResetPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResetPasswordOutcome(PasswordResult.Success()));
+
+        var result = await _controller.ResetPassword(
+            new ResetPasswordRequest("valid-token", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.StatusCode.Should().Be(200);
+        _mediator.Verify(x => x.Send(
+            It.Is<ResetPasswordCommand>(c =>
+                c.Token == "valid-token" &&
+                c.NewPassword == "new-pwd" &&
+                c.IpAddress == "127.0.0.1"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithInvalidToken_Returns400()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ResetPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResetPasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.InvalidResetToken, "Invalid reset token")));
+
+        var result = await _controller.ResetPassword(
+            new ResetPasswordRequest("invalid", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithExpiredToken_Returns400()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ResetPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResetPasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.ResetTokenExpired, "Reset token has expired")));
+
+        var result = await _controller.ResetPassword(
+            new ResetPasswordRequest("expired-token", "new-pwd", "new-pwd"), CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithWeakNewPassword_Returns400()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<ResetPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResetPasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.WeakPassword, "Password too short")));
+
+        var result = await _controller.ResetPassword(
+            new ResetPasswordRequest("valid-token", "weak", "weak"), CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    private static LoginResponse BuildLoginResponse(Guid userId = default, bool passwordExpired = false) =>
+        new("access-token", "refresh-token", DateTime.UtcNow.AddMinutes(15),
+            userId == default ? Guid.NewGuid() : userId,
+            "test@test.com", "Test", "User", null,
+            new List<string>(), passwordExpired);
+
+    [Fact]
+    public async Task Login_WithSuccessfulOutcome_Returns200()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Success(), BuildLoginResponse()));
+
+        var result = await _controller.Login(new LoginRequest("test@test.com", "plain"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.StatusCode.Should().Be(200);
+        _mediator.Verify(x => x.Send(
+            It.Is<LoginCommand>(c => c.Email == "test@test.com" && c.Password == "plain" && c.IpAddress == "127.0.0.1"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidCredentialsOutcome_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Fail(LoginErrorCode.InvalidCredentials, "Invalid email or password"), null));
+
+        var result = await _controller.Login(new LoginRequest("test@test.com", "wrong"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Login_WithUnknownEmailOutcome_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Fail(LoginErrorCode.InvalidCredentials, "Invalid email or password"), null));
+
+        var result = await _controller.Login(new LoginRequest("ghost@test.com", "any"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Login_WithDeactivatedAccountOutcome_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Fail(LoginErrorCode.AccountDeactivated, "Account is deactivated"), null));
+
+        var result = await _controller.Login(new LoginRequest("test@test.com", "plain"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Login_WithLockedAccountOutcome_Returns423()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Fail(LoginErrorCode.AccountLocked, "Account is locked. Try again in 10 minutes.", 10), null));
+
+        var result = await _controller.Login(new LoginRequest("test@test.com", "plain"), CancellationToken.None);
+
+        var status = result.Should().BeOfType<ObjectResult>().Subject;
+        status.StatusCode.Should().Be(423);
+    }
+
+    [Fact]
+    public async Task Login_WithUnconfirmedEmailOutcome_Returns403()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Fail(LoginErrorCode.EmailNotConfirmed, "Email not confirmed. Check your inbox."), null));
+
+        var result = await _controller.Login(new LoginRequest("test@test.com", "plain"), CancellationToken.None);
+
+        var status = result.Should().BeOfType<ObjectResult>().Subject;
+        status.StatusCode.Should().Be(403);
+    }
+
+    [Fact]
+    public async Task Login_PassesIpAddressAndUserAgentToHandler()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Success(), BuildLoginResponse()));
+
+        await _controller.Login(new LoginRequest("test@test.com", "plain"), CancellationToken.None);
+
+        _mediator.Verify(x => x.Send(
+            It.Is<LoginCommand>(c => c.IpAddress == "127.0.0.1" && c.UserAgent != null),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_WithPasswordExpiredResponse_Returns200WithFlag()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginOutcome(LoginResult.Success(), BuildLoginResponse(passwordExpired: true)));
+
+        var result = await _controller.Login(new LoginRequest("test@test.com", "plain"), CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task Refresh_WithValidToken_Returns200AndRotatesTokens()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RefreshCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshOutcome(
+                RefreshResult.Success(),
+                new RefreshResponse("new-access", "new-refresh", DateTime.UtcNow.AddMinutes(15))));
+
+        var result = await _controller.Refresh(new RefreshRequest("raw-refresh"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.StatusCode.Should().Be(200);
+        _mediator.Verify(x => x.Send(
+            It.Is<RefreshCommand>(c => c.RefreshToken == "raw-refresh"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Refresh_WithInvalidTokenFromHandler_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RefreshCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshOutcome(
+                RefreshResult.Fail(RefreshErrorCode.InvalidToken, "Invalid refresh token"), null));
+
+        var result = await _controller.Refresh(new RefreshRequest("ghost"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Refresh_WithCompromisedTokenFromHandler_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RefreshCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshOutcome(
+                RefreshResult.Fail(RefreshErrorCode.TokenCompromised, "Token compromised. All sessions revoked."), null));
+
+        var result = await _controller.Refresh(new RefreshRequest("raw"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Refresh_WithExpiredTokenFromHandler_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RefreshCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshOutcome(
+                RefreshResult.Fail(RefreshErrorCode.TokenExpired, "Refresh token expired"), null));
+
+        var result = await _controller.Refresh(new RefreshRequest("raw"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Refresh_WithMissingUserFromHandler_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RefreshCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshOutcome(
+                RefreshResult.Fail(RefreshErrorCode.UserNotFoundOrInactive, "User not found or inactive"), null));
+
+        var result = await _controller.Refresh(new RefreshRequest("raw"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Refresh_WithInactiveUserFromHandler_Returns401()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RefreshCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RefreshOutcome(
+                RefreshResult.Fail(RefreshErrorCode.UserNotFoundOrInactive, "User not found or inactive"), null));
+
+        var result = await _controller.Refresh(new RefreshRequest("raw"), CancellationToken.None);
+
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task Logout_SendsLogoutCommandAndReturns200()
+    {
+        var result = await _controller.Logout(new RefreshRequest("raw"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.StatusCode.Should().Be(200);
+        _mediator.Verify(x => x.Send(
+            It.Is<LogoutCommand>(c => c.RefreshToken == "raw"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }
