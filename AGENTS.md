@@ -168,7 +168,10 @@ graph LR
 
 | Aspecto | ¿Dónde está ahora? | ¿Dónde debería estar (CQRS)? |
 |---------|-------------------|------------------------------|
-| **Orquestación de negocio** | `Controllers/AuthController.cs:39` — método `Login()` | `Application/Features/Auth/Commands/LoginCommandHandler.cs` |
+| **Orquestación de negocio (Login)** | ✅ `Application/Features/Auth/Commands/Login/LoginCommandHandler.cs` — migrado en `openspec/changes/cqrs-auth-login/` | Mismo lugar ✅ |
+| **Orquestación de negocio (Refresh + Logout)** | ✅ `Application/Features/Auth/Commands/Refresh/RefreshCommandHandler.cs` + `Application/Features/Auth/Commands/Logout/LogoutCommandHandler.cs` — migrado en `openspec/changes/cqrs-auth-refresh/` | Mismo lugar ✅ |
+| **Orquestación de negocio (ChangePassword/ForgotPassword/ResetPassword)** | ✅ `Application/Features/Auth/Commands/ChangePassword/ChangePasswordCommandHandler.cs` + `ForgotPassword/ForgotPasswordCommandHandler.cs` + `ResetPassword/ResetPasswordCommandHandler.cs` — migrado en `openspec/changes/cqrs-auth-password/` | Mismo lugar ✅ |
+| **Orquestación de negocio (ConfirmEmail)** | ✅ `Application/Features/Auth/Commands/ConfirmEmail/ConfirmEmailCommandHandler.cs` — migrado en `openspec/changes/cqrs-auth-confirm-email/` | Mismo lugar ✅ |
 | **Validación de input** | `Application/Common/Validators/AuthValidators.cs` | Mismo lugar ✅ |
 | **Lógica de dominio** | `Domain/Entities/User.cs` — `MarkLogin()`, `LockUntil()`, etc. | Mismo lugar ✅ (invocado desde el handler) |
 | **Persistencia** | `Infrastructure/Persistence/Repositories/` + `UnitOfWork` | Mismo lugar ✅ |
