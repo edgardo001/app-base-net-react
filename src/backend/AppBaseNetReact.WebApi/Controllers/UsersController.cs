@@ -5,6 +5,7 @@
 // resolver a System.IO.FileSystemAclExtensions en ciertos contextos,
 // causando CS7036 (no es un bug del compilador sino una ambiguedad
 // introducida por extension methods de System.IO en el SDK).
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -113,6 +114,9 @@ public class UsersController : ControllerBase
             request.LastName,
             _hasher.HashPassword(request.Password));
 
+        var confirmationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        user.SetEmailConfirmationToken(confirmationToken, DateTime.UtcNow.AddHours(24));
+
         if (request.RoleIds?.Any() == true)
         {
             foreach (var roleId in request.RoleIds)
@@ -122,10 +126,11 @@ public class UsersController : ControllerBase
         await _uow.Users.AddAsync(user, ct);
         await _uow.SaveChangesAsync(ct);
 
-        await SendEmail(user, "Welcome", new Dictionary<string, string>
+        var confirmationLink = $"{Request.Scheme}://{Request.Host}/confirm-email?token={confirmationToken}";
+        await SendEmail(user, "EmailConfirmation", new Dictionary<string, string>
         {
             ["UserName"] = user.FirstName,
-            ["LoginLink"] = $"{Request.Scheme}://{Request.Host}/login"
+            ["ConfirmationLink"] = confirmationLink
         }, ct);
 
         return CreatedAtAction(nameof(GetUser), new { id = user.Id },
