@@ -7,7 +7,7 @@ public class ApiResponse<T>
     public string? Message { get; set; }
     public List<ApiError>? Errors { get; set; }
 
-    public static ApiResponse<T> Ok(T data, string? message = null) => new()
+    public static ApiResponse<T> Ok(T? data, string? message = null) => new()
     {
         Success = true,
         Data = data,
