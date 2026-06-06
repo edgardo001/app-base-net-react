@@ -32,3 +32,8 @@ public interface IDateTimeProvider
 {
     DateTime UtcNow { get; }
 }
+
+public interface IRandomPasswordGenerator
+{
+    string Generate(int length = 12);
+}

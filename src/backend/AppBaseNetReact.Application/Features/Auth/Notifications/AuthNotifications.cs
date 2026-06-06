@@ -66,3 +66,11 @@ public sealed record EmailConfirmedNotification(
     string IpAddress,
     string UserAgent,
     string LoginLink) : INotification;
+
+public sealed record OnboardingEmailResentNotification(
+    Guid UserId,
+    string Email,
+    string FirstName,
+    string NewConfirmationToken,
+    string IpAddress,
+    string UserAgent) : INotification;
