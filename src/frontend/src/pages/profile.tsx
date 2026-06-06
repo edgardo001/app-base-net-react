@@ -7,6 +7,7 @@ import api from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -135,18 +136,18 @@ export function ProfilePage() {
               <form onSubmit={passwordForm.handleSubmit(changePassword)} className="space-y-3">
                 <div className="space-y-1">
                   <Label htmlFor="cp">Contraseña actual</Label>
-                  <Input id="cp" type="password" {...passwordForm.register('currentPassword')} />
+                  <PasswordInput id="cp" {...passwordForm.register('currentPassword')} />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="np">Nueva contraseña</Label>
-                  <Input id="np" type="password" {...passwordForm.register('newPassword')} />
+                  <PasswordInput id="np" {...passwordForm.register('newPassword')} />
                   {passwordForm.formState.errors.newPassword && (
                     <p className="text-sm text-red-500">{passwordForm.formState.errors.newPassword.message}</p>
                   )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="cfp">Confirmar contraseña</Label>
-                  <Input id="cfp" type="password" {...passwordForm.register('confirmPassword')} />
+                  <PasswordInput id="cfp" {...passwordForm.register('confirmPassword')} />
                   {passwordForm.formState.errors.confirmPassword && (
                     <p className="text-sm text-red-500">{passwordForm.formState.errors.confirmPassword.message}</p>
                   )}
