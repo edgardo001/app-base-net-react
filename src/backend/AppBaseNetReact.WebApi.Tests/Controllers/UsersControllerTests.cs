@@ -95,7 +95,43 @@ public class UsersControllerTests
             CancellationToken.None);
 
         capturedBody.Should().NotBeNullOrEmpty();
-        capturedBody.Should().Contain("/confirm-email?token=");
+        capturedBody.Should().Contain("http://localhost:5173/confirm-email?token=");
+    }
+
+    [Fact]
+    public async Task CreateUser_UsesConfiguredFrontendBaseUrl()
+    {
+        var customOptions = new EmailOptions
+        {
+            FrontendBaseUrl = "https://app.example.com",
+            Templates = _emailOptions.Templates
+        };
+        var customController = new UsersController(
+            _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(customOptions));
+        customController.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                Request = { Scheme = "https", Host = new HostString("api.example.com") }
+            }
+        };
+
+        string? capturedBody = null;
+        _uow.Setup(x => x.Users.GetByEmailAsync("new@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+        _email.Setup(x => x.SendEmailAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, CancellationToken>((_, _, body, _) => capturedBody = body)
+            .Returns(Task.CompletedTask);
+
+        await customController.CreateUser(
+            new CreateUserRequest("new@test.com", "Test", "User", "Password1!", null),
+            CancellationToken.None);
+
+        capturedBody.Should().NotBeNullOrEmpty();
+        capturedBody.Should().Contain("https://app.example.com/confirm-email?token=");
+        capturedBody.Should().NotContain("api.example.com");
+        capturedBody.Should().NotContain("localhost:5011");
     }
 
     [Fact]

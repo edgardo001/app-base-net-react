@@ -126,7 +126,7 @@ public class UsersController : ControllerBase
         await _uow.Users.AddAsync(user, ct);
         await _uow.SaveChangesAsync(ct);
 
-        var confirmationLink = $"{Request.Scheme}://{Request.Host}/confirm-email?token={confirmationToken}";
+        var confirmationLink = $"{_emailOptions.FrontendBaseUrl.TrimEnd('/')}/confirm-email?token={confirmationToken}";
         await SendEmail(user, "EmailConfirmation", new Dictionary<string, string>
         {
             ["UserName"] = user.FirstName,

@@ -6,6 +6,7 @@ public class EmailOptions
     public SmtpSettings Smtp { get; set; } = new();
     public string FromName { get; set; } = string.Empty;
     public string FromEmail { get; set; } = string.Empty;
+    public string FrontendBaseUrl { get; set; } = "http://localhost:5173";
     public Dictionary<string, EmailTemplateConfig> Templates { get; set; } = [];
     public int RetryCount { get; set; } = 3;
     public int RetryDelaySeconds { get; set; } = 5;
