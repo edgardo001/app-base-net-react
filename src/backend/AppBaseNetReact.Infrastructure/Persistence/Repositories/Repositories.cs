@@ -96,7 +96,12 @@ public class UserRepository : GenericRepository<User>, IUserRepository
     public UserRepository(AppDbContext context) : base(context) { }
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
-        => await _dbSet.FirstOrDefaultAsync(u => u.NormalizedEmail == email.ToUpperInvariant(), ct);
+        => await _dbSet
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .ThenInclude(r => r.RolePermissions)
+            .ThenInclude(rp => rp.Permission)
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == email.ToUpperInvariant(), ct);
 
     public async Task<User?> GetByIdWithRolesAsync(Guid id, CancellationToken ct = default)
         => await _dbSet

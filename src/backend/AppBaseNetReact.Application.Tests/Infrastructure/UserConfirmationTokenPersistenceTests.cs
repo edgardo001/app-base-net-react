@@ -236,4 +236,57 @@ public class UserConfirmationTokenPersistenceTests
         await act.Should().NotThrowAsync(
             "InMemory provider; on PostgreSQL this would fail pre-migration and pass post-migration");
     }
+
+    [Fact]
+    public async Task GetByEmailAsync_ReturnsUserWithRolesAndPermissionsLoaded()
+    {
+        // Regression guard for the production bug where the JWT issued
+        // at login had no role or permission claims. Cause:
+        // GetByEmailAsync did not Include UserRoles (or its navigations),
+        // so the navigation collection was empty when JwtService iterated
+        // user.UserRoles to emit role/permission claims. The fix adds
+        // Include(UserRoles).ThenInclude(Role).ThenInclude(RolePermissions)
+        // .ThenInclude(Permission) so the LoginCommandHandler can build
+        // a complete JWT.
+        //
+        // The symptom was a 403 on every [Authorize(Roles = ...)] endpoint
+        // for every user, and an empty roles array in the frontend
+        // (test-email card hidden for everyone). Detaching via
+        // ChangeTracker.Clear() forces a fresh load, which is the only
+        // way the test catches a missing Include: without it, the
+        // InMemory provider returns the tracked entity and the
+        // navigation property is "magically" populated.
+        var context = CreateContext(nameof(GetByEmailAsync_ReturnsUserWithRolesAndPermissionsLoaded));
+        var uow = new UnitOfWork(context);
+
+        var role = Role.Create("Admin", "Admin role");
+        var permission = Permission.Create("admin:dashboard", "Dashboard", "Admin", "view dashboard");
+        context.Roles.Add(role);
+        context.Permissions.Add(permission);
+        await context.SaveChangesAsync();
+        role.RolePermissions.Add(RolePermission.Create(role.Id, permission.Id));
+
+        var user = User.Create("u@test.com", "Test", "User", "h");
+        user.UserRoles.Add(UserRole.Create(user.Id, role.Id));
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        // Detach so the next query has to reload from the store.
+        context.ChangeTracker.Clear();
+
+        var found = await uow.Users.GetByEmailAsync("u@test.com", CancellationToken.None);
+
+        found.Should().NotBeNull();
+        found!.UserRoles.Should().NotBeNull().And.NotBeEmpty(
+            "GetByEmailAsync MUST Include UserRoles; otherwise the JWT issued at login " +
+            "has no role claims and [Authorize(Roles = ...)] rejects every user");
+        var userRole = found.UserRoles.First();
+        userRole.Role.Should().NotBeNull(
+            "GetByEmailAsync MUST Include(UserRoles).ThenInclude(Role); without it, " +
+            "JwtService throws NullReferenceException when reading userRole.Role.Name");
+        userRole.Role!.RolePermissions.Should().NotBeEmpty(
+            "GetByEmailAsync MUST Include RolePermissions; without it, the JWT has no " +
+            "permission claims and permission-based [Authorize] rejects every user");
+        userRole.Role.RolePermissions.First().Permission.Should().NotBeNull();
+    }
 }
