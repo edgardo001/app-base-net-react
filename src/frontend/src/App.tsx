@@ -4,6 +4,7 @@ import { LoginPage } from '@/pages/login'
 import { ChangePasswordPage } from '@/pages/change-password'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { ResetPasswordPage } from '@/pages/reset-password'
+import { ConfirmEmailPage } from '@/pages/confirm-email'
 import { DashboardPage } from '@/pages/dashboard'
 import { UsersPage } from '@/pages/users'
 import { RolesPage } from '@/pages/roles'
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/confirm-email" element={<ConfirmEmailPage />} />
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
