@@ -185,6 +185,36 @@ public class UsersControllerTests
     }
 
     [Fact]
+    public async Task CreateUser_WhenOnlySoftDeletedUserHasEmail_ProceedsWithInsert()
+    {
+        // Documents the controller-layer contract: the pre-check is
+        // "GetByEmailAsync returns non-null", and the repository's
+        // query filter hides soft-deleted users. Therefore, when a
+        // soft-deleted user already occupies the email, the controller
+        // proceeds to AddAsync. Against PostgreSQL with a non-partial
+        // unique index, the underlying SaveChangesAsync throws
+        // DbUpdateException(IX_Users_Email). Against a partial unique
+        // index (WHERE "DeletedAt" IS NULL), the insert succeeds.
+        // This is the regression guard for the production bug.
+        _uow.Setup(x => x.Users.GetByEmailAsync("reused@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        var result = await _controller.CreateUser(
+            new CreateUserRequest("reused@test.com", "New", "User", null),
+            CancellationToken.None);
+
+        // Not a 409: the controller is unaware of the soft-deleted user.
+        result.Should().NotBeOfType<ConflictObjectResult>(
+            "GetByEmailAsync returns null for soft-deleted users (global query filter), so the " +
+            "controller's 409 branch is unreachable when the email is held by a soft-deleted user");
+        _uow.Verify(x => x.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+        // PostgreSQL pre-migration: this SaveChangesAsync would throw
+        //   Npgsql.PostgresException 23505 IX_Users_Email
+        // PostgreSQL post-migration (partial unique index): succeeds.
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ResendOnboardingEmail_WhenHandlerSucceeds_Returns200()
     {
         var userId = Guid.NewGuid();

@@ -152,4 +152,88 @@ public class UserConfirmationTokenPersistenceTests
         found!.Id.Should().Be(user.Id);
         found.EmailConfirmed.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task GetByEmailAsync_ForSoftDeletedUser_ReturnsNull()
+    {
+        // Documents the contract: GetByEmailAsync respects the global
+        // query filter (DeletedAt == null), so it returns null for a
+        // soft-deleted user. This is the EXACT precondition for the
+        // duplicate-email bug: a user with email X is soft-deleted,
+        // a new user with email X is requested, GetByEmailAsync returns
+        // null, the controller proceeds with the insert, and PostgreSQL
+        // rejects it with IX_Users_Email. The fix is to make the unique
+        // index partial (WHERE "DeletedAt" IS NULL) so the DB permits
+        // the reuse; see migration 20260606_PartialUniqueEmailForActiveUsers.
+        var context = CreateContext(nameof(GetByEmailAsync_ForSoftDeletedUser_ReturnsNull));
+        var uow = new UnitOfWork(context);
+
+        var user = User.Create("ghost@test.com", "G", "U", "h");
+        await uow.Users.AddAsync(user, CancellationToken.None);
+        await uow.SaveChangesAsync(CancellationToken.None);
+
+        // Sanity check: while the user is active, the lookup finds them.
+        (await uow.Users.GetByEmailAsync("ghost@test.com", CancellationToken.None))
+            .Should().NotBeNull();
+
+        // Soft-delete via the repository (sets DeletedAt).
+        await uow.Users.DeleteAsync(user, CancellationToken.None);
+        await uow.SaveChangesAsync(CancellationToken.None);
+        context.ChangeTracker.Clear();
+
+        // After soft-delete, the lookup returns null because of the
+        // global query filter on User.DeletedAt == null. This is the
+        // precondition that lets the controller's pre-check pass even
+        // though the email is still occupied in the Users table.
+        (await uow.Users.GetByEmailAsync("ghost@test.com", CancellationToken.None))
+            .Should().BeNull(
+                "GetByEmailAsync filters by DeletedAt == null; this is the soft-delete invariant " +
+                "that makes a partial unique index on (Email) WHERE DeletedAt IS NULL necessary " +
+                "for email reuse after deactivation");
+    }
+
+    [Fact]
+    public async Task CreateUser_PassesPreCheck_WhenOnlySoftDeletedUserHasEmail()
+    {
+        // Documents the gap in the controller's pre-check: with a real
+        // soft-deleted user in the table, the controller's call to
+        // GetByEmailAsync returns null (query filter), the 409 branch
+        // is skipped, and the controller proceeds with AddAsync +
+        // SaveChangesAsync. Against PostgreSQL with a non-partial
+        // unique index, the SaveChangesAsync throws DbUpdateException
+        // (IX_Users_Email violation). The InMemory provider does NOT
+        // enforce unique constraints, so this test verifies the
+        // application-layer behavior; the DB-layer fix lives in the
+        // partial unique index migration.
+        var context = CreateContext(nameof(CreateUser_PassesPreCheck_WhenOnlySoftDeletedUserHasEmail));
+        var uow = new UnitOfWork(context);
+
+        var taken = User.Create("reused@test.com", "Old", "User", "h");
+        await uow.Users.AddAsync(taken, CancellationToken.None);
+        await uow.SaveChangesAsync(CancellationToken.None);
+        await uow.Users.DeleteAsync(taken, CancellationToken.None);
+        await uow.SaveChangesAsync(CancellationToken.None);
+        context.ChangeTracker.Clear();
+
+        // GetByEmailAsync returns null (soft-deleted -> query filter).
+        var existing = await uow.Users.GetByEmailAsync("reused@test.com", CancellationToken.None);
+        existing.Should().BeNull(
+            "precondition: the soft-deleted user must not be visible to GetByEmailAsync " +
+            "for this test to model the production bug");
+
+        // The controller, given this null, will call AddAsync + SaveChangesAsync.
+        // Against PostgreSQL with a non-partial unique index, SaveChangesAsync throws.
+        // Against PostgreSQL with a partial unique index, SaveChangesAsync succeeds.
+        // (This test uses InMemory which never enforces unique constraints, so we only
+        //  assert the application-layer behavior; the migration is the actual fix.)
+        var newUser = User.Create("reused@test.com", "New", "User", "h");
+        await uow.Users.AddAsync(newUser, CancellationToken.None);
+        var act = async () => await uow.SaveChangesAsync(CancellationToken.None);
+
+        // InMemory: succeeds (the test asserts what the controller *would do*).
+        // PostgreSQL pre-fix:  would throw Npgsql.PostgresException 23505 IX_Users_Email.
+        // PostgreSQL post-fix: succeeds because the unique index is partial.
+        await act.Should().NotThrowAsync(
+            "InMemory provider; on PostgreSQL this would fail pre-migration and pass post-migration");
+    }
 }
