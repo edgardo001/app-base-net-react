@@ -120,4 +120,36 @@ public class UserConfirmationTokenPersistenceTests
             token, CancellationToken.None);
         found.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Token_AfterForcePasswordChange_StillAllowsConfirmation()
+    {
+        // Guard against regression: UsersController.CreateUser now calls
+        // ForcePasswordChange() so the user is redirected to
+        // /change-password on first login. The EmailConfirmationToken
+        // must remain intact and findable, otherwise the user can never
+        // confirm their email and the whole onboarding flow breaks.
+        var context = CreateContext(nameof(Token_AfterForcePasswordChange_StillAllowsConfirmation));
+        var uow = new UnitOfWork(context);
+
+        var user = User.Create("c@test.com", "C", "U", "h");
+        var token = "TOKENAFTERFORCECHANGE1234567890ABCDEF1234567890ABCDEF12345AB";
+        user.SetEmailConfirmationToken(token, DateTime.UtcNow.AddHours(24));
+        await uow.Users.AddAsync(user, CancellationToken.None);
+        await uow.SaveChangesAsync(CancellationToken.None);
+
+        user.ForcePasswordChange();
+        await uow.SaveChangesAsync(CancellationToken.None);
+        context.ChangeTracker.Clear();
+
+        user.LastPasswordChangeAt.Should().BeNull(
+            "ForcePasswordChange must set LastPasswordChangeAt = null so IsPasswordExpired returns true");
+        var found = await uow.Users.GetByEmailConfirmationTokenAsync(
+            token, CancellationToken.None);
+        found.Should().NotBeNull(
+            "the confirmation token must survive ForcePasswordChange; otherwise a user created with a " +
+            "temporary password would never be able to confirm their email and would be locked out");
+        found!.Id.Should().Be(user.Id);
+        found.EmailConfirmed.Should().BeFalse();
+    }
 }
