@@ -6,11 +6,14 @@
 // causando CS7036 (no es un bug del compilador sino una ambiguedad
 // introducida por extension methods de System.IO en el SDK).
 using System.Security.Cryptography;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using AppBaseNetReact.Application.Common.Interfaces;
+using AppBaseNetReact.Application.Common.Models;
 using AppBaseNetReact.Application.Common.Validators;
+using AppBaseNetReact.Application.Features.Users.Commands.ResendOnboardingEmail;
 using AppBaseNetReact.Domain.Entities;
 using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Services;
@@ -28,19 +31,25 @@ public class UsersController : ControllerBase
     private readonly IEmailService _email;
     private readonly EmailRenderer _renderer;
     private readonly EmailOptions _emailOptions;
+    private readonly IRandomPasswordGenerator _passwords;
+    private readonly IMediator _mediator;
 
     public UsersController(
         IUnitOfWork uow,
         IPasswordHasherService hasher,
         IEmailService email,
         EmailRenderer renderer,
-        IOptions<EmailOptions> emailOptions)
+        IOptions<EmailOptions> emailOptions,
+        IRandomPasswordGenerator passwords,
+        IMediator mediator)
     {
         _uow = uow;
         _hasher = hasher;
         _email = email;
         _renderer = renderer;
         _emailOptions = emailOptions.Value;
+        _passwords = passwords;
+        _mediator = mediator;
     }
 
     [HttpGet]
@@ -108,11 +117,13 @@ public class UsersController : ControllerBase
         if (existing != null)
             return Conflict(ApiResponse<object>.Fail("Email already registered"));
 
+        var temporaryPassword = _passwords.Generate();
         var user = AppBaseNetReact.Domain.Entities.User.Create(
             request.Email,
             request.FirstName,
             request.LastName,
-            _hasher.HashPassword(request.Password));
+            _hasher.HashPassword(temporaryPassword));
+        user.ForcePasswordChange();
 
         var confirmationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         user.SetEmailConfirmationToken(confirmationToken, DateTime.UtcNow.AddHours(24));
@@ -130,11 +141,31 @@ public class UsersController : ControllerBase
         await SendEmail(user, "EmailConfirmation", new Dictionary<string, string>
         {
             ["UserName"] = user.FirstName,
-            ["ConfirmationLink"] = confirmationLink
+            ["ConfirmationLink"] = confirmationLink,
+            ["TemporaryPassword"] = temporaryPassword
         }, ct);
 
         return CreatedAtAction(nameof(GetUser), new { id = user.Id },
             ApiResponse<object>.Ok(new { user.Id, user.Email }));
+    }
+
+    [HttpPost("{id:guid}/resend-onboarding-email")]
+    public async Task<IActionResult> ResendOnboardingEmail(Guid id, CancellationToken ct)
+    {
+        var command = new ResendOnboardingEmailCommand(
+            id,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
+        var outcome = await _mediator.Send(command, ct);
+
+        return outcome.Result.ErrorCode switch
+        {
+            ResendOnboardingErrorCode.None => Ok(ApiResponse<object>.Ok(null, "Onboarding email re-sent")),
+            ResendOnboardingErrorCode.UserNotFound => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            ResendOnboardingErrorCode.AlreadyConfirmed => Conflict(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpPut("{id:guid}")]
