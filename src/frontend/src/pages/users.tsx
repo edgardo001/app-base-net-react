@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send } from 'lucide-react'
 
 interface User {
   id: string
@@ -31,7 +31,6 @@ const userSchema = z.object({
   email: z.string().email('Email inválido'),
   firstName: z.string().min(1, 'Requerido').max(100),
   lastName: z.string().min(1, 'Requerido').max(100),
-  password: z.string().min(6, 'Mínimo 6 caracteres').optional().or(z.literal('')),
 })
 
 type UserForm = z.infer<typeof userSchema>
@@ -46,6 +45,8 @@ export function UsersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [resendFeedback, setResendFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
   const pageSize = 10
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserForm>({
@@ -75,7 +76,7 @@ export function UsersPage() {
   const openCreate = () => {
     setEditingId(null)
     setSelectedRoles([])
-    reset({ email: '', firstName: '', lastName: '', password: '' })
+    reset({ email: '', firstName: '', lastName: '' })
     setShowModal(true)
   }
 
@@ -83,7 +84,7 @@ export function UsersPage() {
     setEditingId(user.id)
     try {
       const { data } = await api.get(`/users/${user.id}`)
-      reset({ email: data.data.email, firstName: data.data.firstName, lastName: data.data.lastName, password: '' })
+      reset({ email: data.data.email, firstName: data.data.firstName, lastName: data.data.lastName })
       setSelectedRoles(data.data.roles?.map((r: { id: string }) => r.id) || [])
     } catch { /* ignore */ }
     setShowModal(true)
@@ -113,6 +114,23 @@ export function UsersPage() {
     if (!confirm('¿Eliminar este usuario?')) return
     await api.delete(`/users/${id}`)
     fetchUsers()
+  }
+
+  const resendOnboardingEmail = async (id: string) => {
+    setResendingId(id)
+    setResendFeedback(null)
+    try {
+      await api.post(`/users/${id}/resend-onboarding-email`)
+      setResendFeedback({ id, type: 'ok', msg: 'Correo de bienvenida reenviado' })
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? 'No se pudo reenviar el correo')
+        : 'No se pudo reenviar el correo'
+      setResendFeedback({ id, type: 'err', msg })
+    } finally {
+      setResendingId(null)
+      setTimeout(() => setResendFeedback(null), 4000)
+    }
   }
 
   const totalPages = Math.ceil(total / pageSize)
@@ -171,12 +189,32 @@ export function UsersPage() {
                     <td className="px-4 py-3">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-3">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title="Editar"><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => toggleActive(u.id, u.isActive)} title={u.isActive ? 'Desactivar' : 'Activar'}>
-                          {u.isActive ? <Ban className="h-4 w-4 text-red-500" /> : <CheckCircle className="h-4 w-4 text-green-500" />}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteUser(u.id)} title="Eliminar"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex justify-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => toggleActive(u.id, u.isActive)} title={u.isActive ? 'Desactivar' : 'Activar'}>
+                            {u.isActive ? <Ban className="h-4 w-4 text-red-500" /> : <CheckCircle className="h-4 w-4 text-green-500" />}
+                          </Button>
+                          {!u.emailConfirmed && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => resendOnboardingEmail(u.id)}
+                              disabled={resendingId === u.id}
+                              title="Reenviar correo de bienvenida"
+                            >
+                              {resendingId === u.id
+                                ? <RefreshCw className="h-4 w-4 animate-spin" />
+                                : <Send className="h-4 w-4 text-blue-500" />}
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={() => deleteUser(u.id)} title="Eliminar"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                        </div>
+                        {resendFeedback?.id === u.id && (
+                          <p className={`text-xs ${resendFeedback.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
+                            {resendFeedback.msg}
+                          </p>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -225,11 +263,9 @@ export function UsersPage() {
                   </div>
                 </div>
                 {!editingId && (
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Contraseña</Label>
-                    <Input id="password" type="password" {...register('password')} />
-                    {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Se generará una contraseña temporal automáticamente y se enviará al correo junto con el enlace de confirmación.
+                  </p>
                 )}
                 <div className="space-y-2">
                   <Label>Roles</Label>
