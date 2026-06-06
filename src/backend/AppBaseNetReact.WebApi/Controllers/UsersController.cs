@@ -161,7 +161,7 @@ public class UsersController : ControllerBase
 
         return outcome.Result.ErrorCode switch
         {
-            ResendOnboardingErrorCode.None => Ok(ApiResponse<object>.Ok(null, "Onboarding email re-sent")),
+            ResendOnboardingErrorCode.None => Ok(ApiResponse<object>.Ok("Onboarding email re-sent")),
             ResendOnboardingErrorCode.UserNotFound => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
             ResendOnboardingErrorCode.AlreadyConfirmed => Conflict(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
             _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
@@ -184,7 +184,7 @@ public class UsersController : ControllerBase
         }
 
         await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(null, "User updated"));
+        return Ok(ApiResponse<object>.Ok("User updated"));
     }
 
     [HttpDelete("{id:guid}")]
@@ -195,7 +195,7 @@ public class UsersController : ControllerBase
 
         await _uow.Users.DeleteAsync(user, ct);
         await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(null, "User deleted"));
+        return Ok(ApiResponse<object>.Ok("User deleted"));
     }
 
     [HttpPatch("{id:guid}/activate")]
@@ -206,7 +206,7 @@ public class UsersController : ControllerBase
 
         user.SetActive(request.Active);
         await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(null, request.Active ? "User activated" : "User deactivated"));
+        return Ok(ApiResponse<object>.Ok(request.Active ? "User activated" : "User deactivated"));
     }
 
     [HttpPatch("{id:guid}/reset-password")]
@@ -227,7 +227,7 @@ public class UsersController : ControllerBase
             ["LoginLink"] = $"{Request.Scheme}://{Request.Host}/login"
         }, ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "Temporary password sent via email"));
+        return Ok(ApiResponse<object>.Ok("Temporary password sent via email"));
     }
 
     [HttpPatch("{id:guid}/revoke-tokens")]
@@ -235,7 +235,7 @@ public class UsersController : ControllerBase
     {
         await _uow.RefreshTokens.RevokeAllForUserAsync(id, null, ct);
         await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(null, "All sessions revoked for user"));
+        return Ok(ApiResponse<object>.Ok("All sessions revoked for user"));
     }
 
     private async Task SendEmail(Domain.Entities.User user, string templateName, Dictionary<string, string> extraVars, CancellationToken ct)

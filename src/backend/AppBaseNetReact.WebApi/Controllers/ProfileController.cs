@@ -85,6 +85,6 @@ public async Task<IActionResult> GetActivity(CancellationToken ct)
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             Request.Headers.UserAgent.ToString(), null, ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "Profile updated"));
+        return Ok(ApiResponse<object>.Ok("Profile updated"));
     }
 }

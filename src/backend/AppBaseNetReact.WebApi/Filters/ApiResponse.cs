@@ -14,6 +14,12 @@ public class ApiResponse<T>
         Message = message
     };
 
+    public static ApiResponse<T> Ok(string message) => new()
+    {
+        Success = true,
+        Message = message
+    };
+
     public static ApiResponse<T> Fail(string message, List<ApiError>? errors = null) => new()
     {
         Success = false,

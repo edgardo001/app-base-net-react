@@ -94,7 +94,7 @@ public class AdminController : ControllerBase
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             Request.Headers.UserAgent.ToString(), null, ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "All sessions revoked"));
+        return Ok(ApiResponse<object>.Ok("All sessions revoked"));
     }
 
     [HttpPost("test-email")]
@@ -132,7 +132,7 @@ public class AdminController : ControllerBase
                 HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 Request.Headers.UserAgent.ToString(), null, ct);
 
-            return Ok(ApiResponse<object>.Ok(null, $"Test email sent to {request.To}"));
+            return Ok(ApiResponse<object>.Ok($"Test email sent to {request.To}"));
         }
         catch (Exception ex)
         {

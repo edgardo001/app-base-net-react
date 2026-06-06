@@ -102,7 +102,7 @@ public class RolesController : ControllerBase
             Request.Headers.UserAgent.ToString(),
             $"Role '{oldName}' updated to '{role.Name}'", ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "Role updated"));
+        return Ok(ApiResponse<object>.Ok("Role updated"));
     }
 
     [HttpDelete("{id:guid}")]
@@ -124,7 +124,7 @@ public class RolesController : ControllerBase
             Request.Headers.UserAgent.ToString(),
             $"Role '{roleName}' deleted", ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "Role deleted"));
+        return Ok(ApiResponse<object>.Ok("Role deleted"));
     }
 
     [HttpPatch("{id:guid}/permissions")]
@@ -150,7 +150,7 @@ public class RolesController : ControllerBase
             Request.Headers.UserAgent.ToString(),
             $"Permissions updated for role '{role.Name}'", ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "Permissions updated"));
+        return Ok(ApiResponse<object>.Ok("Permissions updated"));
     }
 
     private Guid? GetCurrentUserId()

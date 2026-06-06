@@ -97,7 +97,7 @@ public class AuthController : ControllerBase
 
         await _mediator.Send(command, ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "Logged out successfully"));
+        return Ok(ApiResponse<object>.Ok("Logged out successfully"));
     }
 
     [HttpPost("change-password")]
@@ -118,7 +118,7 @@ public class AuthController : ControllerBase
 
         return outcome.Result.ErrorCode switch
         {
-            PasswordErrorCode.None => Ok(ApiResponse<object>.Ok(null, "Password changed successfully")),
+            PasswordErrorCode.None => Ok(ApiResponse<object>.Ok("Password changed successfully")),
             PasswordErrorCode.UserNotFound => NotFound(),
             _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
         };
@@ -135,7 +135,7 @@ public class AuthController : ControllerBase
 
         await _mediator.Send(command, ct);
 
-        return Ok(ApiResponse<object>.Ok(null, "If the email exists, a password reset link has been sent."));
+        return Ok(ApiResponse<object>.Ok("If the email exists, a password reset link has been sent."));
     }
 
     [HttpPost("reset-password")]
@@ -151,7 +151,7 @@ public class AuthController : ControllerBase
 
         return outcome.Result.ErrorCode switch
         {
-            PasswordErrorCode.None => Ok(ApiResponse<object>.Ok(null, "Password reset successfully")),
+            PasswordErrorCode.None => Ok(ApiResponse<object>.Ok("Password reset successfully")),
             _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
         };
     }
@@ -170,7 +170,7 @@ public class AuthController : ControllerBase
 
         return outcome.Result.ErrorCode switch
         {
-            EmailErrorCode.None => Ok(ApiResponse<object>.Ok(null, "Email confirmed successfully")),
+            EmailErrorCode.None => Ok(ApiResponse<object>.Ok("Email confirmed successfully")),
             _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
         };
     }
