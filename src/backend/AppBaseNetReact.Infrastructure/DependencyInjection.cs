@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
+        services.AddSingleton<IRandomPasswordGenerator, RandomPasswordGenerator>();
         services.AddSingleton<EmailRenderer>();
         services.AddSingleton<EmailQueueService>();
         services.AddScoped<IEmailService, EmailService>();
