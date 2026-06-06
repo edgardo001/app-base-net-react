@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import api from '@/lib/api'
+import { extractRoles } from '@/lib/jwt'
 
 interface User {
   id: string
@@ -12,6 +13,7 @@ interface User {
 interface AuthState {
   user: User | null
   permissions: string[]
+  roles: string[]
   isAuthenticated: boolean
   passwordExpired: boolean
   login: (email: string, password: string) => Promise<boolean>
@@ -25,6 +27,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   permissions: [],
+  roles: extractRoles(localStorage.getItem('accessToken')),
   isAuthenticated: !!localStorage.getItem('accessToken'),
   passwordExpired: false,
 
@@ -35,7 +38,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { accessToken, refreshToken, user: u, permissions: perms, passwordExpired } = data.data
     localStorage.setItem('accessToken', accessToken)
     localStorage.setItem('refreshToken', refreshToken)
-    set({ user: u, permissions: perms, isAuthenticated: true, passwordExpired: !!passwordExpired })
+    set({
+      user: u,
+      permissions: perms,
+      roles: extractRoles(accessToken),
+      isAuthenticated: true,
+      passwordExpired: !!passwordExpired,
+    })
     return !!passwordExpired
   },
 
@@ -49,7 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       // ignore logout errors
     }
     localStorage.clear()
-    set({ user: null, permissions: [], isAuthenticated: false })
+    set({ user: null, permissions: [], roles: [], isAuthenticated: false })
   },
 
   // checkAuth: verifica si el token actual aun es valido consultando /profile.
@@ -63,7 +72,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { data } = await api.get('/profile')
       const user = data.data
-      set({ user, isAuthenticated: true })
+      set({ user, roles: extractRoles(token), isAuthenticated: true })
     } catch {
       set({ isAuthenticated: false })
     }

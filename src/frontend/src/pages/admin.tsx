@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Activity, ShieldAlert, RefreshCw, Mail, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/auth-store'
+import { ROLE_CLAIM_NAMES } from '@/lib/jwt'
 
 interface AuditEntry {
   action: string
@@ -17,6 +19,8 @@ interface AuditEntry {
 }
 
 export function AdminPage() {
+  const roles = useAuthStore((s) => s.roles)
+  const canTestEmail = roles.includes(ROLE_CLAIM_NAMES.Admin) || roles.includes(ROLE_CLAIM_NAMES.SuperAdmin)
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -73,29 +77,31 @@ export function AdminPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" /> Correo de Prueba
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Input
-              type="email"
-              placeholder="correo@ejemplo.com"
-              value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
-              disabled={sending}
-              className="max-w-sm"
-            />
-            <Button onClick={sendTestEmail} disabled={sending}>
-              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-              Enviar
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {canTestEmail && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" /> Correo de Prueba
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <Input
+                type="email"
+                placeholder="correo@ejemplo.com"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                disabled={sending}
+                className="max-w-sm"
+              />
+              <Button onClick={sendTestEmail} disabled={sending}>
+                {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                Enviar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

@@ -98,6 +98,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpPost("test-email")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
     public async Task<IActionResult> SendTestEmail([FromBody] SendTestEmailRequest request, CancellationToken ct)
     {
         if (!_emailOptions.Templates.TryGetValue("TestEmail", out var config))
