@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send } from 'lucide-react'
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send } from 'lucide-react'
 
 interface User {
   id: string
@@ -110,12 +110,6 @@ export function UsersPage() {
     fetchUsers()
   }
 
-  const deleteUser = async (id: string) => {
-    if (!confirm('¿Eliminar este usuario?')) return
-    await api.delete(`/users/${id}`)
-    fetchUsers()
-  }
-
   const resendOnboardingEmail = async (id: string) => {
     setResendingId(id)
     setResendFeedback(null)
@@ -208,7 +202,6 @@ export function UsersPage() {
                                 : <Send className="h-4 w-4 text-blue-500" />}
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" onClick={() => deleteUser(u.id)} title="Eliminar"><Trash2 className="h-4 w-4 text-red-500" /></Button>
                         </div>
                         {resendFeedback?.id === u.id && (
                           <p className={`text-xs ${resendFeedback.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>

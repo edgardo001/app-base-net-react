@@ -187,17 +187,6 @@ public class UsersController : ControllerBase
         return Ok(ApiResponse<object>.Ok("User updated"));
     }
 
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> DeleteUser(Guid id, CancellationToken ct)
-    {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return NotFound();
-
-        await _uow.Users.DeleteAsync(user, ct);
-        await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok("User deleted"));
-    }
-
     [HttpPatch("{id:guid}/activate")]
     public async Task<IActionResult> ToggleActive(Guid id, [FromBody] ToggleActiveRequest request, CancellationToken ct)
     {
