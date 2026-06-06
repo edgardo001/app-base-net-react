@@ -3,6 +3,7 @@ using System;
 using AppBaseNetReact.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AppBaseNetReact.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260606143024_MakeEmailAndNormalizedEmailPartialUniqueIndexes")]
+    partial class MakeEmailAndNormalizedEmailPartialUniqueIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -447,7 +450,6 @@ namespace AppBaseNetReact.Infrastructure.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique()
-                        .HasFilter("\"DeletedAt\" IS NULL")
                         .HasDatabaseName("IX_Users_Email");
 
                     b.HasIndex("IsActive")
@@ -455,7 +457,6 @@ namespace AppBaseNetReact.Infrastructure.Migrations
 
                     b.HasIndex("NormalizedEmail")
                         .IsUnique()
-                        .HasFilter("\"DeletedAt\" IS NULL")
                         .HasDatabaseName("IX_Users_NormalizedEmail");
 
                     b.ToTable("Users", (string)null);

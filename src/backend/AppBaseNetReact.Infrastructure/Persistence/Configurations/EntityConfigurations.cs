@@ -21,8 +21,19 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.EmailConfirmationToken).HasMaxLength(256);
         builder.Property(u => u.ConcurrencyToken).IsConcurrencyToken();
 
-        builder.HasIndex(u => u.NormalizedEmail).IsUnique().HasDatabaseName("IX_Users_NormalizedEmail");
-        builder.HasIndex(u => u.Email).IsUnique().HasDatabaseName("IX_Users_Email");
+        // Partial unique indexes: enforce uniqueness only among ACTIVE users
+        // (DeletedAt IS NULL). Soft-deleted users do not occupy the email,
+        // so a re-creation with the same email succeeds. The query filter
+        // hides soft-deleted users from the application, so the controller
+        // pre-check (GetByEmailAsync) returns null after deactivation.
+        builder.HasIndex(u => u.NormalizedEmail)
+            .IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL")
+            .HasDatabaseName("IX_Users_NormalizedEmail");
+        builder.HasIndex(u => u.Email)
+            .IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL")
+            .HasDatabaseName("IX_Users_Email");
         builder.HasIndex(u => u.IsActive).HasDatabaseName("IX_Users_IsActive");
         builder.HasIndex(u => u.DeletedAt).HasDatabaseName("IX_Users_DeletedAt");
             // Soft delete global filter: excluye usuarios eliminados de TODAS las queries.
