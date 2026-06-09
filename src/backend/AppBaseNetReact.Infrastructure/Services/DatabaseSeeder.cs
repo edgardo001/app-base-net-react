@@ -102,7 +102,7 @@ public static class DatabaseSeeder
 
         // Admin user
         var adminUser = User.Create(
-            "admin",
+            "admin@sistema.local",
             "Admin",
             "Usuario",
             hasher.HashPassword("admin"),
