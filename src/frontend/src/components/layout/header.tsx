@@ -1,19 +1,26 @@
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { PanelLeftOpen, PanelLeftClose } from 'lucide-react'
+import { PanelLeftOpen, PanelLeftClose, Menu, X } from 'lucide-react'
 
 interface HeaderProps {
   onToggleCollapse: () => void
+  onToggleMobile: () => void
   sidebarCollapsed: boolean
+  mobileOpen: boolean
 }
 
-export function Header({ onToggleCollapse, sidebarCollapsed }: HeaderProps) {
+export function Header({ onToggleCollapse, onToggleMobile, sidebarCollapsed, mobileOpen }: HeaderProps) {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
 
   return (
     <header className="flex h-14 items-center justify-between border-b px-6">
+      {/* Móvil: hamburguesa / X */}
+      <Button variant="ghost" size="icon" onClick={onToggleMobile} className="md:hidden">
+        {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+      </Button>
+      {/* Escritorio: colapsar / expandir sidebar */}
       <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="hidden md:inline-flex">
         {sidebarCollapsed
           ? <PanelLeftOpen className="h-4 w-4" />

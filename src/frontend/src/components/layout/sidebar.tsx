@@ -1,7 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Menu, X } from 'lucide-react'
 import {
   LayoutDashboard,
   Users,
@@ -29,7 +27,6 @@ const navItems = [
 interface SidebarProps {
   collapsed: boolean
   mobileOpen: boolean
-  onToggleMobile: () => void
   onCloseMobile: () => void
 }
 
@@ -68,19 +65,9 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   )
 }
 
-export function Sidebar({ collapsed, mobileOpen, onToggleMobile, onCloseMobile }: SidebarProps) {
+export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) {
   return (
     <>
-      {/* Móvil: botón hamburguesa flotante */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onToggleMobile}
-        className="fixed left-4 top-3 z-50 md:hidden"
-      >
-        {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-      </Button>
-
       {/* Desktop: sidebar inline */}
       <aside className={cn(
         'hidden flex-col border-r bg-sidebar md:flex',

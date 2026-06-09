@@ -46,13 +46,14 @@ export function Layout() {
       <Sidebar
         collapsed={sidebarCollapsed}
         mobileOpen={mobileOpen}
-        onToggleMobile={() => setMobileOpen(prev => !prev)}
         onCloseMobile={closeMobile}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           onToggleCollapse={toggleCollapse}
+          onToggleMobile={() => setMobileOpen(prev => !prev)}
           sidebarCollapsed={sidebarCollapsed}
+          mobileOpen={mobileOpen}
         />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
