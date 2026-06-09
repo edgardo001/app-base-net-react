@@ -2,15 +2,18 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api, { getErrorMessage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
+import { useTheme } from '@/hooks/use-theme'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Moon, Sun } from 'lucide-react'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
+  const { theme, toggleTheme } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -39,6 +42,11 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/50">
+      <div className="fixed right-4 top-4">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">UserMVP</CardTitle>
