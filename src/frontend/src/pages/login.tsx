@@ -9,6 +9,18 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data
+    if (data?.message) return data.message
+    if (data?.errors?.length) return data.errors.map((e: { message: string }) => e.message).join(', ')
+    if (err.response?.status === 423) return 'Cuenta bloqueada. Intenta de nuevo más tarde.'
+    if (err.response?.status === 403) return 'Correo no confirmado. Revisa tu bandeja de entrada.'
+    if (err.response?.status === 401) return 'Correo o contraseña incorrectos.'
+  }
+  return fallback
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
@@ -32,8 +44,7 @@ export function LoginPage() {
       const expired = await login(email, password)
       navigate(expired ? '/change-password' : '/dashboard')
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error al iniciar sesión'
-      setError(msg || 'Error al iniciar sesión')
+      setError(getErrorMessage(err, 'Error al iniciar sesión'))
     } finally {
       setLoading(false)
     }
@@ -62,6 +73,8 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoFocus
+                disabled={loading}
+                placeholder="correo@ejemplo.com"
               />
             </div>
             <div className="space-y-2">
@@ -71,6 +84,7 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>

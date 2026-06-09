@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
@@ -8,9 +9,19 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import api from '@/lib/api'
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data
+    if (data?.message) return data.message
+    if (data?.errors?.length) return data.errors.map((e: { message: string }) => e.message).join(', ')
+  }
+  return fallback
+}
+
 export function ChangePasswordPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
+  const logout = useAuthStore((s) => s.logout)
   const email = useAuthStore((s) => s.user?.email)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -32,13 +43,16 @@ export function ChangePasswordPage() {
     setLoading(true)
     try {
       await api.post('/auth/change-password', { currentPassword, newPassword, confirmPassword })
+      toast.success('Contraseña cambiada exitosamente')
       if (email) {
         await login(email, newPassword)
+        navigate('/dashboard')
+      } else {
+        await logout()
+        navigate('/login')
       }
-      navigate('/dashboard')
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error al cambiar contraseña'
-      setError(msg || 'Error al cambiar contraseña')
+      setError(getErrorMessage(err, 'Error al cambiar contraseña'))
     } finally {
       setLoading(false)
     }
@@ -66,6 +80,7 @@ export function ChangePasswordPage() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
                 autoFocus
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -76,6 +91,7 @@ export function ChangePasswordPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={6}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -86,10 +102,11 @@ export function ChangePasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={6}
+                disabled={loading}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Cambiando...' : 'Cambiar contraseña'}
+              {loading ? 'Cambiando contraseña...' : 'Cambiar contraseña'}
             </Button>
           </form>
         </CardContent>

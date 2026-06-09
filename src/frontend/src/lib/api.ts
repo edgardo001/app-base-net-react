@@ -40,10 +40,18 @@ api.interceptors.request.use((config) => {
 
 // Response interceptor: detecta 401 y ejecuta refresh token automaticamente.
 // Usa axios.post (no api.post) para evitar ciclos infinitos con el interceptor mismo.
+// IMPORTANTE: skip para endpoints de auth (login/forgot/reset) donde 401 es esperado.
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
+    const url: string = original?.url || ''
+
+    // No interceptor para endpoints de autenticacion (401 = credenciales invalidas, no token expirado)
+    if (url.includes('/auth/login') || url.includes('/auth/forgot-password') || url.includes('/auth/reset-password')) {
+      return Promise.reject(error)
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       if (isRefreshing) {
         // Ya hay un refresh en progreso: encolar esta request para reintentar despues.
@@ -57,24 +65,29 @@ api.interceptors.response.use(
       original._retry = true
       isRefreshing = true
       const refreshToken = localStorage.getItem('refreshToken')
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post('/api/auth/refresh', { refreshToken })
-          const newToken = data.data.accessToken
-          localStorage.setItem('accessToken', newToken)
-          localStorage.setItem('refreshToken', data.data.refreshToken)
-          processQueue(null, newToken)
-          original.headers.Authorization = `Bearer ${newToken}`
-          return api(original)
-        } catch (err) {
-          // Refresh fallo (token expirado o revocado): limpiar y redirigir a login.
-          processQueue(err, null)
-          localStorage.clear()
-          window.location.href = '/login'
-          return Promise.reject(err)
-        } finally {
-          isRefreshing = false
-        }
+      if (!refreshToken) {
+        // Sin refresh token: limpiar estado y rechazar.
+        isRefreshing = false
+        localStorage.clear()
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
+      try {
+        const { data } = await axios.post('/api/auth/refresh', { refreshToken })
+        const newToken = data.data.accessToken
+        localStorage.setItem('accessToken', newToken)
+        localStorage.setItem('refreshToken', data.data.refreshToken)
+        processQueue(null, newToken)
+        original.headers.Authorization = `Bearer ${newToken}`
+        return api(original)
+      } catch (err) {
+        // Refresh fallo (token expirado o revocado): limpiar y redirigir a login.
+        processQueue(err, null)
+        localStorage.clear()
+        window.location.href = '/login'
+        return Promise.reject(err)
+      } finally {
+        isRefreshing = false
       }
     }
     return Promise.reject(error)
