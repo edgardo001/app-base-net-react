@@ -46,9 +46,13 @@ public class GenericRepository<T> : IRepository<T> where T : BaseEntity
 
         if (!string.IsNullOrWhiteSpace(sortBy))
         {
-            query = sortDesc
-                ? query.OrderByDescending(e => EF.Property<object>(e, sortBy))
-                : query.OrderBy(e => EF.Property<object>(e, sortBy));
+            var keySelector = BuildSortExpression(sortBy);
+            if (keySelector != null)
+            {
+                query = sortDesc
+                    ? query.OrderByDescending(keySelector)
+                    : query.OrderBy(keySelector);
+            }
         }
 
         var items = await query
@@ -63,6 +67,23 @@ public class GenericRepository<T> : IRepository<T> where T : BaseEntity
             Page = page,
             PageSize = pageSize
         };
+    }
+
+    private static Expression<Func<T, object>>? BuildSortExpression(string sortBy)
+    {
+        var param = Expression.Parameter(typeof(T), "e");
+        Expression body;
+
+        var prop = typeof(T).GetProperty(sortBy,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
+
+        if (prop == null) return null;
+
+        body = Expression.Property(param, prop);
+        if (prop.PropertyType.IsValueType && prop.PropertyType != typeof(object))
+            body = Expression.Convert(body, typeof(object));
+
+        return Expression.Lambda<Func<T, object>>(body, param);
     }
 
     public virtual async Task<T> AddAsync(T entity, CancellationToken ct = default)
