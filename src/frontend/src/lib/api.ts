@@ -119,7 +119,7 @@ export function getErrorMessage(err: unknown, fallback: string): string {
     // Códigos HTTP específicos sin body parseado
     switch (axiosErr.response.status) {
       case 401: return 'Correo o contraseña incorrectos.'
-      case 403: return 'Correo no confirmado. Revisa tu bandeja de entrada.'
+      case 403: return 'Acceso denegado. No tienes permisos para realizar esta acción.'
       case 423: return 'Cuenta bloqueada. Intenta de nuevo más tarde.'
       case 429: return 'Demasiadas solicitudes. Intenta de nuevo más tarde.'
       case 500: return 'Error interno del servidor.'

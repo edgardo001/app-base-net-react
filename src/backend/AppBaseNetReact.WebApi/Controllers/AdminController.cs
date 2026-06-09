@@ -11,7 +11,7 @@ namespace AppBaseNetReact.WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "SuperAdmin")]
+[Authorize(Roles = "SuperAdmin,Admin")]
 public class AdminController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
@@ -98,7 +98,6 @@ public class AdminController : ControllerBase
     }
 
     [HttpPost("test-email")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
     public async Task<IActionResult> SendTestEmail([FromBody] SendTestEmailRequest request, CancellationToken ct)
     {
         if (!_emailOptions.Templates.TryGetValue("TestEmail", out var config))

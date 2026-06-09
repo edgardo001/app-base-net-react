@@ -43,42 +43,38 @@ public class AdminControllerTests
     }
 
     [Fact]
-    public void SendTestEmail_AuthorizeAttribute_AcceptsAdminAndSuperAdmin()
+    public void SendTestEmail_InheritsClassLevelAuthorizeForAdminAndSuperAdmin()
     {
-        // Regression guard: only Admin and SuperAdmin roles may send
-        // a test email. The class-level [Authorize(Roles = "SuperAdmin")]
-        // would reject an Admin-role user, so the action MUST override
-        // with [Authorize(Roles = "SuperAdmin,Admin")]. This test
-        // documents the rule at the metadata level because the actual
-        // authorization evaluation happens in the ASP.NET Core pipeline,
-        // not in the controller's method body.
+        // Regression guard: Admin and SuperAdmin roles may access all AdminController
+        // endpoints. The class-level [Authorize(Roles = "SuperAdmin,Admin")] covers
+        // all actions including test-email. This test documents the rule at the
+        // metadata level because the actual authorization evaluation happens in the
+        // ASP.NET Core pipeline, not in the controller's method body.
         var method = typeof(AdminController).GetMethod(
             nameof(AdminController.SendTestEmail),
             BindingFlags.Public | BindingFlags.Instance);
         method.Should().NotBeNull("SendTestEmail action must exist on AdminController");
 
-        var auth = method!.GetCustomAttribute<AuthorizeAttribute>();
-        auth.Should().NotBeNull(
-            "test-email must have an explicit Authorize attribute overriding the class-level SuperAdmin-only rule");
-
-        var roles = auth!.Roles!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        roles.Should().Contain("SuperAdmin",
-            "SuperAdmin keeps the existing super-user privilege");
-        roles.Should().Contain("Admin",
-            "Admin must be added so the seeded 'admin' user (with role 'Admin') can test SMTP");
-        roles.Should().NotContain(r => r != "SuperAdmin" && r != "Admin",
-            "no other roles may send test email (regression guard against opening it up by accident)");
+        var methodAuth = method!.GetCustomAttribute<AuthorizeAttribute>();
+        methodAuth.Should().BeNull(
+            "test-email no longer needs an explicit Authorize attribute since class-level already allows Admin and SuperAdmin");
     }
 
     [Fact]
-    public void AdminController_ClassLevelAuthorize_RestrictsOtherEndpointsToSuperAdmin()
+    public void AdminController_ClassLevelAuthorize_AllowsAdminAndSuperAdmin()
     {
-        // Documents the rest of the controller: class-level still
-        // SuperAdmin-only. Only test-email is opened up to Admin.
+        // Documents the class-level authorization: both Admin and SuperAdmin
+        // roles may access all endpoints in this controller (dashboard,
+        // audit-log, revoke-all-tokens, test-email).
         var classAuth = typeof(AdminController).GetCustomAttribute<AuthorizeAttribute>();
         classAuth.Should().NotBeNull();
-        classAuth!.Roles.Should().Be("SuperAdmin",
-            "the class-level rule is intentionally stricter; the test-email action is the only exception");
+        var roles = classAuth!.Roles!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        roles.Should().Contain("SuperAdmin",
+            "SuperAdmin keeps the existing super-user privilege");
+        roles.Should().Contain("Admin",
+            "Admin must be allowed to access dashboard, audit-log, and test-email");
+        roles.Should().NotContain(r => r != "SuperAdmin" && r != "Admin",
+            "no other roles may access admin endpoints (regression guard)");
     }
 
     [Fact]
