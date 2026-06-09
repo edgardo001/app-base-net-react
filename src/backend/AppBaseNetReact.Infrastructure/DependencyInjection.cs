@@ -1,5 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using System.Text;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -18,6 +20,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
+        });
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(
                 configuration.GetConnectionString("PostgreSQL"),
@@ -26,6 +32,11 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.Configure<PasswordPolicySettings>(configuration.GetSection("PasswordPolicy"));
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        var emailOptions = configuration.GetSection("Email").Get<EmailOptions>()
+            ?? throw new InvalidOperationException("Email settings not configured");
+        if (string.IsNullOrWhiteSpace(emailOptions.FrontendBaseUrl))
+            throw new InvalidOperationException(
+                "Email:FrontendBaseUrl is required. Set it in appsettings.Production.json (e.g. https://your-domain.com).");
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
