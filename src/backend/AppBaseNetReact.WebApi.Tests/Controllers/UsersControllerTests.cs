@@ -251,4 +251,148 @@ public class UsersControllerTests
 
         result.Should().BeOfType<ConflictObjectResult>();
     }
+
+    [Fact]
+    public async Task GetUsers_ReturnsOkWithPagedResponse()
+    {
+        var users = new List<AppBaseNetReact.Domain.Entities.User>
+        {
+            AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash")
+        };
+        _uow.Setup(x => x.Users.GetPagedAsync(
+            It.IsAny<int>(), It.IsAny<int>(), null,
+            It.IsAny<string?>(), It.IsAny<bool>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AppBaseNetReact.Application.Common.Interfaces.PagedResult<AppBaseNetReact.Domain.Entities.User>
+            {
+                Items = users,
+                TotalCount = 1,
+                Page = 1,
+                PageSize = 10
+            });
+
+        var result = await _controller.GetUsers(page: 1, pageSize: 10, ct: CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetUser_WhenExists_ReturnsOkWithUserDetail()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _controller.GetUser(userId, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<UserDetailDto>>().Subject;
+        response.Success.Should().BeTrue();
+        response.Data!.Email.Should().Be("a@test.com");
+    }
+
+    [Fact]
+    public async Task GetUser_WhenNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+
+        var result = await _controller.GetUser(Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task UpdateUser_WhenExists_ReturnsOk()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _controller.UpdateUser(userId,
+            new UpdateUserRequest("NewFirst", "NewLast", null), CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateUser_WhenNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+
+        var result = await _controller.UpdateUser(Guid.NewGuid(),
+            new UpdateUserRequest("First", "Last", null), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task ToggleActive_WhenExists_ReturnsOk()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _controller.ToggleActive(userId,
+            new ToggleActiveRequest(false), CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ToggleActive_WhenNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+
+        var result = await _controller.ToggleActive(Guid.NewGuid(),
+            new ToggleActiveRequest(true), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task ResetPassword_WhenExists_ReturnsOk()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _controller.ResetPassword(userId, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPassword_WhenNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+
+        var result = await _controller.ResetPassword(Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task RevokeTokens_CallsRevokeAllAndSaves()
+    {
+        var userId = Guid.NewGuid();
+        var refreshTokens = new Mock<IRefreshTokenRepository>();
+        _uow.Setup(x => x.RefreshTokens).Returns(refreshTokens.Object);
+
+        var result = await _controller.RevokeTokens(userId, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        refreshTokens.Verify(x => x.RevokeAllForUserAsync(userId, null, It.IsAny<CancellationToken>()), Times.Once);
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
