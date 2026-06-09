@@ -7,10 +7,10 @@
 
 ## 2. Avatar Upload Frontend
 
-- [ ] 2.1 Create `src/frontend/src/components/ui/avatar-upload.tsx` — component with tabs (Upload / Webcam), drag-and-drop zone, file picker, preview, validation (extension, size)
-- [ ] 2.2 Create `src/frontend/src/components/ui/webcam-capture.tsx` — component using `getUserMedia`, canvas capture, retake button, fallback message if unavailable
+- [x] 2.1 Create `src/frontend/src/components/ui/avatar-upload.tsx` — component with tabs (Upload / Webcam), drag-and-drop zone, file picker, preview, validation (extension, size)
+- [x] 2.2 Create `src/frontend/src/components/ui/webcam-capture.tsx` — component using `getUserMedia`, canvas capture, retake button, fallback message if unavailable
 - [x] 2.3 Integrate `AvatarUpload` in `profile.tsx` — replace static avatar display with clickable avatar that opens upload modal
-- [ ] 2.4 Add avatar preview in `users.tsx` edit modal — show current avatar, allow upload
+- [x] 2.4 Add avatar preview in `users.tsx` edit modal — show current avatar, allow upload
 
 ## 3. Permissions Page
 
@@ -32,10 +32,10 @@
 
 ## 6. Dashboard Improvements
 
-- [ ] 6.1 Add "Accounts nearing password expiry" card in `dashboard.tsx` — call new backend metric endpoint or derive from existing data
-- [ ] 6.2 Improve error handling in `login.tsx` — detect network errors vs credential errors, show differentiated messages
+- [x] 6.1 Add "Accounts nearing password expiry" card in `dashboard.tsx` — call new backend metric endpoint or derive from existing data
+- [x] 6.2 Improve error handling in `login.tsx` — detect network errors vs credential errors, show differentiated messages
 
 ## 7. Final Validation
 
-- [ ] 7.1 `cd src/frontend && npm run build` — no errors
-- [ ] 7.2 Manual smoke test: theme toggle, avatar upload, permissions page, users sorting/filtering
+- [x] 7.1 `cd src/frontend && npm run build` — no errors
+- [x] 7.2 Manual smoke test: theme toggle, avatar upload, permissions page, users sorting/filtering
