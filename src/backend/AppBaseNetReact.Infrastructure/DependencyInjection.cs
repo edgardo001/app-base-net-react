@@ -13,6 +13,7 @@ using AppBaseNetReact.Infrastructure.Identity;
 using AppBaseNetReact.Infrastructure.Persistence;
 using AppBaseNetReact.Infrastructure.Persistence.Repositories;
 using AppBaseNetReact.Infrastructure.Services;
+using AppBaseNetReact.Infrastructure.Storage;
 
 namespace AppBaseNetReact.Infrastructure;
 
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.Configure<PasswordPolicySettings>(configuration.GetSection("PasswordPolicy"));
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        services.Configure<StorageOptions>(configuration.GetSection("Storage"));
         var emailOptions = configuration.GetSection("Email").Get<EmailOptions>()
             ?? throw new InvalidOperationException("Email settings not configured");
         if (string.IsNullOrWhiteSpace(emailOptions.FrontendBaseUrl))
@@ -49,6 +51,7 @@ public static class DependencyInjection
         services.AddSingleton<EmailQueueService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IEmailJob, EmailJob>();
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
         var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()
             ?? throw new InvalidOperationException("JWT settings not configured");
