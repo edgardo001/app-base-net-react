@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { PanelLeftOpen, PanelLeftClose, Menu, X } from 'lucide-react'
 import {
   LayoutDashboard,
   Users,
@@ -24,12 +26,17 @@ const navItems = [
   { to: '/tipo-c', label: 'Tipo C', icon: BookType },
 ]
 
-export function Sidebar({ collapsed }: { collapsed: boolean }) {
+interface SidebarProps {
+  collapsed: boolean
+  mobileOpen: boolean
+  onToggleCollapse: () => void
+  onToggleMobile: () => void
+  onCloseMobile: () => void
+}
+
+function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
   return (
-    <aside className={cn(
-      'flex flex-col border-r bg-sidebar p-4 transition-all duration-300',
-      collapsed ? 'w-16' : 'w-64',
-    )}>
+    <>
       <div className={cn(
         'mb-8 font-bold tracking-tight transition-all',
         collapsed ? 'text-center text-sm' : 'text-lg',
@@ -42,9 +49,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             key={to}
             to={to}
             title={collapsed ? label : undefined}
+            onClick={onNavClick}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-0' : 'px-3',
                 isActive
                   ? 'bg-primary text-primary-foreground'
@@ -57,6 +65,54 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           </NavLink>
         ))}
       </nav>
-    </aside>
+    </>
+  )
+}
+
+export function Sidebar({ collapsed, mobileOpen, onToggleCollapse, onToggleMobile, onCloseMobile }: SidebarProps) {
+  return (
+    <>
+      {/* Móvil: botón hamburguesa flotante */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onToggleMobile}
+        className="fixed left-4 top-3 z-50 md:hidden"
+      >
+        {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+      </Button>
+
+      {/* Desktop: sidebar inline con botón de colapsar */}
+      <aside className={cn(
+        'hidden flex-col border-r bg-sidebar md:flex',
+        collapsed ? 'w-16' : 'w-64',
+        'transition-all duration-300',
+      )}>
+        <div className="flex items-center justify-end p-2">
+          <Button variant="ghost" size="icon" onClick={onToggleCollapse}>
+            {collapsed
+              ? <PanelLeftOpen className="h-4 w-4" />
+              : <PanelLeftClose className="h-4 w-4" />
+            }
+          </Button>
+        </div>
+        <div className="flex-1 px-4 pb-4">
+          <SidebarContent collapsed={collapsed} />
+        </div>
+      </aside>
+
+      {/* Móvil: backdrop + drawer overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/50 transition-opacity"
+            onClick={onCloseMobile}
+          />
+          <aside className="relative flex h-full w-64 flex-col border-r bg-sidebar p-4">
+            <SidebarContent collapsed={false} onNavClick={onCloseMobile} />
+          </aside>
+        </div>
+      )}
+    </>
   )
 }
