@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { User, KeyRound, Clock } from 'lucide-react'
+import { User, KeyRound, Clock, Camera } from 'lucide-react'
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'Requerido').max(100),
@@ -44,6 +44,7 @@ export function ProfilePage() {
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdError, setPwdError] = useState('')
   const [activityError, setActivityError] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -89,6 +90,23 @@ export function ProfilePage() {
     }
   }
 
+  const uploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      await api.post(`/profile/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      setProfileMsg('Avatar actualizado')
+    } catch (err: unknown) {
+      setProfileMsg(getErrorMessage(err, 'Error al subir avatar'))
+    }
+    setUploading(false)
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
@@ -100,13 +118,20 @@ export function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                {user?.avatarPath && <AvatarImage src={user.avatarPath} />}
-                <AvatarFallback className="text-lg">{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-16 w-16">
+                  {user?.avatarPath && <AvatarImage src={`/api/profile/avatar`} />}
+                  <AvatarFallback className="text-lg">{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <label className="absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-primary p-1.5 text-primary-foreground shadow-sm hover:bg-primary/90">
+                  <Camera className="h-3 w-3" />
+                  <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={uploadAvatar} disabled={uploading} />
+                </label>
+              </div>
               <div>
                 <p className="font-medium">{user?.firstName} {user?.lastName}</p>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
+                {uploading && <p className="text-xs text-muted-foreground">Subiendo...</p>}
               </div>
             </div>
             {profileMsg && <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">{profileMsg}</div>}
