@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound } from 'lucide-react'
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 
 interface User {
   id: string
@@ -40,6 +40,10 @@ export function UsersPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<string>('createdAt')
+  const [sortDesc, setSortDesc] = useState(true)
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all')
+  const [filterConfirmed, setFilterConfirmed] = useState<'all' | 'confirmed' | 'pending'>('all')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -59,8 +63,15 @@ export function UsersPage() {
     setLoading(true)
     setError('')
     try {
-      const { data } = await api.get('/users', { params: { page, pageSize, search } })
-      setUsers(data.items || [])
+      const { data } = await api.get('/users', { params: { page, pageSize, search, sortBy, sortDesc } })
+      let items = data.items || []
+      if (filterActive !== 'all') {
+        items = items.filter((u: User) => filterActive === 'active' ? u.isActive : !u.isActive)
+      }
+      if (filterConfirmed !== 'all') {
+        items = items.filter((u: User) => filterConfirmed === 'confirmed' ? u.emailConfirmed : !u.emailConfirmed)
+      }
+      setUsers(items)
       setTotal(data.totalCount || 0)
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Error al cargar usuarios'))
@@ -68,7 +79,7 @@ export function UsersPage() {
       setTotal(0)
     }
     setLoading(false)
-  }, [page, search])
+  }, [page, search, sortBy, sortDesc, filterActive, filterConfirmed])
 
   const fetchRoles = async () => {
     try {
@@ -149,6 +160,22 @@ export function UsersPage() {
 
   const totalPages = Math.ceil(total / pageSize)
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortDesc(!sortDesc)
+    } else {
+      setSortBy(column)
+      setSortDesc(false)
+    }
+  }
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortBy !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
+    return sortDesc
+      ? <ArrowDown className="ml-1 h-3 w-3" />
+      : <ArrowUp className="ml-1 h-3 w-3" />
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -158,8 +185,8 @@ export function UsersPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar por email o nombre..."
@@ -168,6 +195,24 @@ export function UsersPage() {
                 className="pl-10"
               />
             </div>
+            <select
+              value={filterActive}
+              onChange={(e) => { setFilterActive(e.target.value as typeof filterActive); setPage(1) }}
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="active">Activos</option>
+              <option value="inactive">Inactivos</option>
+            </select>
+            <select
+              value={filterConfirmed}
+              onChange={(e) => { setFilterConfirmed(e.target.value as typeof filterConfirmed); setPage(1) }}
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="all">Todos los emails</option>
+              <option value="confirmed">Confirmados</option>
+              <option value="pending">Pendientes</option>
+            </select>
             <Button variant="outline" size="icon" onClick={fetchUsers}><RefreshCw className="h-4 w-4" /></Button>
           </div>
         </CardHeader>
@@ -184,12 +229,24 @@ export function UsersPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Email</th>
-                  <th className="px-4 py-3 text-left font-medium">Nombre</th>
-                  <th className="px-4 py-3 text-center font-medium">Estado</th>
-                  <th className="px-4 py-3 text-center font-medium">Confirmado</th>
-                  <th className="px-4 py-3 text-left font-medium">Último Login</th>
-                  <th className="px-4 py-3 text-left font-medium">Creado</th>
+                  <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-muted/80" onClick={() => handleSort('email')}>
+                    Email <SortIcon column="email" />
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-muted/80" onClick={() => handleSort('firstName')}>
+                    Nombre <SortIcon column="firstName" />
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium cursor-pointer hover:bg-muted/80" onClick={() => handleSort('isActive')}>
+                    Estado <SortIcon column="isActive" />
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium cursor-pointer hover:bg-muted/80" onClick={() => handleSort('emailConfirmed')}>
+                    Confirmado <SortIcon column="emailConfirmed" />
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-muted/80" onClick={() => handleSort('lastLoginAt')}>
+                    Último Login <SortIcon column="lastLoginAt" />
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-muted/80" onClick={() => handleSort('createdAt')}>
+                    Creado <SortIcon column="createdAt" />
+                  </th>
                   <th className="px-4 py-3 text-center font-medium">Acciones</th>
                 </tr>
               </thead>
