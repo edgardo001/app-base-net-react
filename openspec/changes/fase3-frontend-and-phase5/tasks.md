@@ -1,34 +1,34 @@
 ## 1. Theme Toggle (Dark/Light)
 
-- [ ] 1.1 Add inline `<script>` in `index.html` that reads `localStorage('theme')` and sets `class="dark"` on `<html>` before React mounts (prevents FOUC)
-- [ ] 1.2 Create `src/frontend/src/hooks/use-theme.ts` hook — reads/writes theme to localStorage, applies `dark` class to `<html>`, respects `prefers-color-scheme`
-- [ ] 1.3 Create `src/frontend/src/components/ui/theme-toggle.tsx` — button with Sun/Moon icons, calls `useTheme` to toggle
-- [ ] 1.4 Integrate `ThemeToggle` in `header.tsx` next to the user avatar/name
+- [x] 1.1 Add inline `<script>` in `index.html` that reads `localStorage('theme')` and sets `class="dark"` on `<html>` before React mounts (prevents FOUC)
+- [x] 1.2 Create `src/frontend/src/hooks/use-theme.ts` hook — reads/writes theme to localStorage, applies `dark` class to `<html>`, respects `prefers-color-scheme`
+- [x] 1.3 Create `src/frontend/src/components/ui/theme-toggle.tsx` — button with Sun/Moon icons, calls `useTheme` to toggle
+- [x] 1.4 Integrate `ThemeToggle` in `header.tsx` next to the user avatar/name
 
 ## 2. Avatar Upload Frontend
 
 - [ ] 2.1 Create `src/frontend/src/components/ui/avatar-upload.tsx` — component with tabs (Upload / Webcam), drag-and-drop zone, file picker, preview, validation (extension, size)
 - [ ] 2.2 Create `src/frontend/src/components/ui/webcam-capture.tsx` — component using `getUserMedia`, canvas capture, retake button, fallback message if unavailable
-- [ ] 2.3 Integrate `AvatarUpload` in `profile.tsx` — replace static avatar display with clickable avatar that opens upload modal
+- [x] 2.3 Integrate `AvatarUpload` in `profile.tsx` — replace static avatar display with clickable avatar that opens upload modal
 - [ ] 2.4 Add avatar preview in `users.tsx` edit modal — show current avatar, allow upload
 
 ## 3. Permissions Page
 
-- [ ] 3.1 Implement `permissions.tsx` — fetch `GET /api/permissions/modules`, display as grouped table/cards by module, show code/name/description for each permission
-- [ ] 3.2 Add "No permissions found" empty state
+- [x] 3.1 Implement `permissions.tsx` — fetch `GET /api/permissions/modules`, display as grouped table/cards by module, show code/name/description for each permission
+- [x] 3.2 Add "No permissions found" empty state
 
 ## 4. Advanced User Table
 
-- [ ] 4.1 Add sorting state (`sortBy`, `sortDesc`) to `users.tsx` — send params in API request
-- [ ] 4.2 Add clickable column headers with sort indicator arrows (↑↓) in users table
-- [ ] 4.3 Add filter dropdowns above users table — status (Active/Inactive), role (fetch from API), clear button
-- [ ] 4.4 Send filter params (`isActive`, `roleId`) in API request
+- [x] 4.1 Add sorting state (`sortBy`, `sortDesc`) to `users.tsx` — send params in API request
+- [x] 4.2 Add clickable column headers with sort indicator arrows (↑↓) in users table
+- [x] 4.3 Add filter dropdowns above users table — status (Active/Inactive), role (fetch from API), clear button
+- [x] 4.4 Send filter params (`isActive`, `roleId`) in API request
 
 ## 5. Users by Role View
 
-- [ ] 5.1 Add "View Users" button in each role card in `roles.tsx`
-- [ ] 5.2 Create modal or expandable section that fetches `GET /api/roles/{id}/users` and displays user list
-- [ ] 5.3 Handle empty state ("No users assigned")
+- [x] 5.1 Add "View Users" button in each role card in `roles.tsx`
+- [x] 5.2 Create modal or expandable section that fetches `GET /api/roles/{id}/users` and displays user list
+- [x] 5.3 Handle empty state ("No users assigned")
 
 ## 6. Dashboard Improvements
 
