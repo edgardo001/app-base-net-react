@@ -45,6 +45,7 @@ logs/
 storage/
 uploads/
 avatars/
+!src/**/Storage/
 
 
 
