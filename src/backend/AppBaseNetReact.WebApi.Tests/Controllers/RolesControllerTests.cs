@@ -234,4 +234,55 @@ public class RolesControllerTests
 
         result.Should().BeOfType<NotFoundResult>();
     }
+
+    [Fact]
+    public async Task GetUsersByRole_WhenExists_ReturnsOkWithUsers()
+    {
+        var roleId = Guid.NewGuid();
+        var role = Role.Create("Admin", "desc");
+        _uow.Setup(x => x.Roles.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(role);
+
+        var users = new List<AppBaseNetReact.Domain.Entities.User>
+        {
+            AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash")
+        };
+        _uow.Setup(x => x.Users.GetUsersByRoleAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(users);
+
+        var result = await _controller.GetUsersByRole(roleId, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<List<UserByRoleDto>>>().Subject;
+        response.Data.Should().HaveCount(1);
+        response.Data![0].Email.Should().Be("a@test.com");
+    }
+
+    [Fact]
+    public async Task GetUsersByRole_WhenRoleNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Roles.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Role?)null);
+
+        var result = await _controller.GetUsersByRole(Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetUsersByRole_WhenNoUsers_ReturnsEmptyList()
+    {
+        var roleId = Guid.NewGuid();
+        var role = Role.Create("Admin", "desc");
+        _uow.Setup(x => x.Roles.GetByIdAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(role);
+        _uow.Setup(x => x.Users.GetUsersByRoleAsync(roleId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppBaseNetReact.Domain.Entities.User>());
+
+        var result = await _controller.GetUsersByRole(roleId, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<List<UserByRoleDto>>>().Subject;
+        response.Data.Should().BeEmpty();
+    }
 }

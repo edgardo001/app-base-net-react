@@ -153,6 +153,24 @@ public class RolesController : ControllerBase
         return Ok(ApiResponse<object>.Ok("Permissions updated"));
     }
 
+    [HttpGet("{id:guid}/users")]
+    public async Task<IActionResult> GetUsersByRole(Guid id, CancellationToken ct)
+    {
+        var role = await _uow.Roles.GetByIdAsync(id, ct);
+        if (role == null) return NotFound();
+
+        var users = await _uow.Users.GetUsersByRoleAsync(id, ct);
+        return Ok(ApiResponse<List<UserByRoleDto>>.Ok(users.Select(u => new UserByRoleDto
+        {
+            Id = u.Id,
+            Email = u.Email,
+            FirstName = u.FirstName,
+            LastName = u.LastName,
+            IsActive = u.IsActive,
+            LastLoginAt = u.LastLoginAt
+        }).ToList()));
+    }
+
     private Guid? GetCurrentUserId()
     {
         var sub = User.FindFirst("sub")?.Value;
@@ -171,3 +189,13 @@ public class RoleDetailDto
 }
 
 // Types defined in AppBaseNetReact.Application.Common.Validators
+
+public class UserByRoleDto
+{
+    public Guid Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+}
