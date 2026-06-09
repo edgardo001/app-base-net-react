@@ -1,11 +1,10 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate()
@@ -32,8 +31,7 @@ export function ForgotPasswordPage() {
       await api.post('/auth/forgot-password', { email })
       setSuccess(true)
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error al procesar solicitud'
-      setError(msg || 'Error al procesar solicitud')
+      setError(getErrorMessage(err, 'Error al procesar solicitud'))
     } finally {
       setLoading(false)
     }

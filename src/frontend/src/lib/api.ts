@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type AxiosError } from 'axios'
 
 // Axios instance preconfigurada con baseURL para evitar repetir /api en cada componente.
 // En desarrollo, Vite proxy redirige /api a localhost:5011.
@@ -95,3 +95,35 @@ api.interceptors.response.use(
 )
 
 export default api
+
+/**
+ * Extrae un mensaje legible para el usuario desde un error de Axios.
+ * Maneja errores de red (backend caído), respuestas con body, y códigos HTTP específicos.
+ */
+export function getErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const axiosErr = err as AxiosError<{ message?: string; errors?: Array<{ message: string }> }>
+
+    // Error de red: backend caído, CORS, DNS, timeout
+    if (!axiosErr.response) {
+      if (axiosErr.code === 'ECONNABORTED' || axiosErr.code === 'ERR_NETWORK') {
+        return 'No se pudo conectar con el servidor. Verifica que el servicio esté disponible.'
+      }
+      return 'No se pudo conectar con el servidor.'
+    }
+
+    const data = axiosErr.response.data
+    if (data?.message) return data.message
+    if (data?.errors?.length) return data.errors.map(e => e.message).join(', ')
+
+    // Códigos HTTP específicos sin body parseado
+    switch (axiosErr.response.status) {
+      case 401: return 'Correo o contraseña incorrectos.'
+      case 403: return 'Correo no confirmado. Revisa tu bandeja de entrada.'
+      case 423: return 'Cuenta bloqueada. Intenta de nuevo más tarde.'
+      case 429: return 'Demasiadas solicitudes. Intenta de nuevo más tarde.'
+      case 500: return 'Error interno del servidor.'
+    }
+  }
+  return fallback
+}

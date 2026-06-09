@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import axios from 'axios'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,6 +48,7 @@ export function UsersPage() {
   const [resendFeedback, setResendFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
   const [resetId, setResetId] = useState<string | null>(null)
   const [resetFeedback, setResetFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
+  const [error, setError] = useState('')
   const pageSize = 10
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserForm>({
@@ -57,11 +57,16 @@ export function UsersPage() {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const { data } = await api.get('/users', { params: { page, pageSize, search } })
       setUsers(data.items || [])
       setTotal(data.totalCount || 0)
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al cargar usuarios'))
+      setUsers([])
+      setTotal(0)
+    }
     setLoading(false)
   }, [page, search])
 
@@ -69,7 +74,7 @@ export function UsersPage() {
     try {
       const { data } = await api.get('/roles')
       setRoles(data.data || [])
-    } catch { /* ignore */ }
+    } catch { /* roles are secondary — ignore */ }
   }
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
@@ -88,7 +93,9 @@ export function UsersPage() {
       const { data } = await api.get(`/users/${user.id}`)
       reset({ email: data.data.email, firstName: data.data.firstName, lastName: data.data.lastName })
       setSelectedRoles(data.data.roles?.map((r: { id: string }) => r.id) || [])
-    } catch { /* ignore */ }
+    } catch {
+      setSelectedRoles([])
+    }
     setShowModal(true)
   }
 
@@ -102,8 +109,7 @@ export function UsersPage() {
       setShowModal(false)
       fetchUsers()
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error'
-      alert(msg || 'Error')
+      alert(getErrorMessage(err, 'Error al guardar usuario'))
     }
   }
 
@@ -120,10 +126,7 @@ export function UsersPage() {
       await api.patch(`/users/${id}/reset-password`)
       setResetFeedback({ id, type: 'ok', msg: 'Contraseña restablecida — correo enviado' })
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err)
-        ? (err.response?.data?.message ?? 'Error al restablecer contraseña')
-        : 'Error al restablecer contraseña'
-      setResetFeedback({ id, type: 'err', msg })
+      setResetFeedback({ id, type: 'err', msg: getErrorMessage(err, 'Error al restablecer contraseña') })
     } finally {
       setResetId(null)
       setTimeout(() => setResetFeedback(null), 4000)
@@ -137,10 +140,7 @@ export function UsersPage() {
       await api.post(`/users/${id}/resend-onboarding-email`)
       setResendFeedback({ id, type: 'ok', msg: 'Correo de bienvenida reenviado' })
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err)
-        ? (err.response?.data?.message ?? 'No se pudo reenviar el correo')
-        : 'No se pudo reenviar el correo'
-      setResendFeedback({ id, type: 'err', msg })
+      setResendFeedback({ id, type: 'err', msg: getErrorMessage(err, 'No se pudo reenviar el correo') })
     } finally {
       setResendingId(null)
       setTimeout(() => setResendFeedback(null), 4000)
@@ -172,6 +172,14 @@ export function UsersPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {error && (
+            <div className="mx-4 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-center justify-between">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={fetchUsers}>
+                <RefreshCw className="mr-1 h-4 w-4" /> Reintentar
+              </Button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

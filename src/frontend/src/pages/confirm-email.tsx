@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import axios from 'axios'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 
 type Status = 'pending' | 'success' | 'error'
 
@@ -29,11 +28,8 @@ export function ConfirmEmailPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        const msg = axios.isAxiosError(err)
-          ? err.response?.data?.message
-          : 'No se pudo confirmar el correo.'
         setStatus('error')
-        setMessage(msg || 'No se pudo confirmar el correo. El enlace puede haber expirado.')
+        setMessage(getErrorMessage(err, 'No se pudo confirmar el correo. El enlace puede haber expirado.'))
       })
     return () => {
       cancelled = true

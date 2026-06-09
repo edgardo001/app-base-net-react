@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
-import api from '@/lib/api'
+import { useState, useEffect, useCallback } from 'react'
+import api, { getErrorMessage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Users, UserCheck, UserPlus, Activity } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Users, UserCheck, UserPlus, Activity, RefreshCw } from 'lucide-react'
 
 interface DashboardData {
   totalUsers: number
@@ -24,23 +25,29 @@ export function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const [data, setData] = useState<DashboardData | null>(null)
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
+  const [error, setError] = useState('')
+
+  const fetchDashboard = useCallback(async () => {
+    setError('')
+    try {
+      const { data: res } = await api.get('/admin/dashboard')
+      setData(res.data)
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al cargar el dashboard'))
+    }
+  }, [])
+
+  const fetchAudit = useCallback(async () => {
+    try {
+      const { data: res } = await api.get('/admin/audit-log')
+      setAuditLog(res.data?.items || [])
+    } catch { /* ignore — audit log is secondary */ }
+  }, [])
 
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const { data: res } = await api.get('/admin/dashboard')
-        setData(res.data)
-      } catch { /* ignore */ }
-    }
-    const fetchAudit = async () => {
-      try {
-        const { data: res } = await api.get('/admin/audit-log')
-        setAuditLog(res.data?.items || [])
-      } catch { /* ignore */ }
-    }
     fetchDashboard()
     fetchAudit()
-  }, [])
+  }, [fetchDashboard, fetchAudit])
 
   const cards = [
     { title: 'Total Usuarios', value: data?.totalUsers ?? '—', icon: Users, color: 'text-blue-600' },
@@ -71,6 +78,15 @@ export function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {error && (
+        <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive flex items-center justify-between">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={fetchDashboard}>
+            <RefreshCw className="mr-1 h-4 w-4" /> Reintentar
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

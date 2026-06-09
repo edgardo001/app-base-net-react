@@ -1,11 +1,10 @@
 import { type FormEvent, useState } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -32,8 +31,7 @@ export function ResetPasswordPage() {
       await api.post('/auth/reset-password', { token, newPassword, confirmPassword })
       navigate('/login')
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error al restablecer contraseña'
-      setError(msg || 'Error al restablecer contraseña')
+      setError(getErrorMessage(err, 'Error al restablecer contraseña'))
     } finally {
       setLoading(false)
     }

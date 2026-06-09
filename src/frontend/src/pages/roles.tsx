@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, Shield } from 'lucide-react'
+import { Plus, Pencil, Trash2, Shield, RefreshCw } from 'lucide-react'
 
 interface Role {
   id: string
@@ -44,7 +43,9 @@ export function RolesPage() {
     try {
       const { data } = await api.get('/roles')
       setRoles(data.data || [])
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al cargar roles'))
+    }
     setLoading(false)
   }
 
@@ -52,7 +53,7 @@ export function RolesPage() {
     try {
       const { data } = await api.get('/permissions/modules')
       setPermissions(data.data || [])
-    } catch { /* ignore */ }
+    } catch { /* permissions are secondary — ignore */ }
   }
 
   useEffect(() => { fetchRoles() }, [])
@@ -97,8 +98,7 @@ export function RolesPage() {
       setShowModal(false)
       fetchRoles()
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error'
-      setError(msg || 'Error')
+      setError(getErrorMessage(err, 'Error al guardar rol'))
     }
   }
 
@@ -122,6 +122,13 @@ export function RolesPage() {
 
       {loading ? (
         <div className="flex justify-center py-12 text-muted-foreground">Cargando...</div>
+      ) : error && roles.length === 0 ? (
+        <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive flex items-center justify-between">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={fetchRoles}>
+            <RefreshCw className="mr-1 h-4 w-4" /> Reintentar
+          </Button>
+        </div>
       ) : (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {roles.map((r) => (

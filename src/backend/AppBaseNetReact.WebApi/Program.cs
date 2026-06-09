@@ -98,6 +98,23 @@ try
     app.UseAuthorization();
     app.MapControllers();
 
+    // Health check endpoint — verifica conectividad con la base de datos.
+    app.MapGet("/health", async (HttpContext context) =>
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<Microsoft.EntityFrameworkCore.DbContext>();
+            await dbContext.Database.CanConnectAsync(context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(new { status = "healthy", database = "connected" });
+        }
+        catch
+        {
+            context.Response.StatusCode = 503;
+            await context.Response.WriteAsJsonAsync(new { status = "unhealthy", database = "disconnected" });
+        }
+    });
+
     Log.Information("User Management API starting...");
     app.Run();
 }

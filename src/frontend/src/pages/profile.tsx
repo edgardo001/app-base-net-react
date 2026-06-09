@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import axios from 'axios'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +43,7 @@ export function ProfilePage() {
   const [profileMsg, setProfileMsg] = useState('')
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdError, setPwdError] = useState('')
+  const [activityError, setActivityError] = useState('')
 
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -59,7 +59,9 @@ export function ProfilePage() {
       try {
         const { data } = await api.get('/profile/activity')
         setActivities(data.data || [])
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        setActivityError(getErrorMessage(err, 'Error al cargar actividad'))
+      }
     }
     fetchActivity()
   }, [])
@@ -70,8 +72,8 @@ export function ProfilePage() {
       await api.put('/profile', form)
       setProfileMsg('Perfil actualizado')
       useAuthStore.setState({ user: { ...user!, ...form } })
-    } catch {
-      setProfileMsg('Error al actualizar')
+    } catch (err: unknown) {
+      setProfileMsg(getErrorMessage(err, 'Error al actualizar perfil'))
     }
   }
 
@@ -83,8 +85,7 @@ export function ProfilePage() {
       setPwdMsg('Contraseña cambiada exitosamente')
       passwordForm.reset()
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.message : 'Error'
-      setPwdError(msg || 'Error')
+      setPwdError(getErrorMessage(err, 'Error al cambiar contraseña'))
     }
   }
 
@@ -164,7 +165,9 @@ export function ProfilePage() {
           <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Actividad Reciente</CardTitle>
         </CardHeader>
         <CardContent>
-          {activities.length === 0 ? (
+          {activityError ? (
+            <p className="text-sm text-destructive">{activityError}</p>
+          ) : activities.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin actividad registrada</p>
           ) : (
             <div className="space-y-2">

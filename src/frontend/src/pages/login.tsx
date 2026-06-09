@@ -1,25 +1,12 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import axios from 'axios'
-import api from '@/lib/api'
+import api, { getErrorMessage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data
-    if (data?.message) return data.message
-    if (data?.errors?.length) return data.errors.map((e: { message: string }) => e.message).join(', ')
-    if (err.response?.status === 423) return 'Cuenta bloqueada. Intenta de nuevo más tarde.'
-    if (err.response?.status === 403) return 'Correo no confirmado. Revisa tu bandeja de entrada.'
-    if (err.response?.status === 401) return 'Correo o contraseña incorrectos.'
-  }
-  return fallback
-}
 
 export function LoginPage() {
   const navigate = useNavigate()

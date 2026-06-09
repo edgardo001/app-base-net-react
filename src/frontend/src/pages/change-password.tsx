@@ -1,22 +1,12 @@
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import axios from 'axios'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api from '@/lib/api'
-
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data
-    if (data?.message) return data.message
-    if (data?.errors?.length) return data.errors.map((e: { message: string }) => e.message).join(', ')
-  }
-  return fallback
-}
+import api, { getErrorMessage } from '@/lib/api'
 
 export function ChangePasswordPage() {
   const navigate = useNavigate()

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import api from '@/lib/api'
+import { useState, useEffect, useCallback } from 'react'
+import api, { getErrorMessage } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,16 +27,20 @@ export function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [testEmail, setTestEmail] = useState('')
   const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
 
-  const fetchAudit = async () => {
+  const fetchAudit = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const { data } = await api.get('/admin/audit-log', { params: { page, pageSize: 20 } })
       setAuditLog(data.data?.items || [])
       setTotal(data.data?.totalCount || 0)
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al cargar auditoría'))
+    }
     setLoading(false)
-  }
+  }, [page])
 
   useEffect(() => { fetchAudit() }, [page])
 
@@ -46,7 +50,9 @@ export function AdminPage() {
       await api.post('/admin/revoke-all-tokens')
       toast.success('Todas las sesiones han sido revocadas')
       fetchAudit()
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Error al revocar sesiones'))
+    }
   }
 
   const sendTestEmail = async () => {
@@ -60,8 +66,7 @@ export function AdminPage() {
       toast.success('Correo de prueba enviado correctamente')
       setTestEmail('')
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al enviar correo de prueba'
-      toast.error(msg)
+      toast.error(getErrorMessage(err, 'Error al enviar correo de prueba'))
     }
     setSending(false)
   }
@@ -115,6 +120,14 @@ export function AdminPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {error && (
+            <div className="mx-4 mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-center justify-between">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={fetchAudit}>
+                <RefreshCw className="mr-1 h-4 w-4" /> Reintentar
+              </Button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
