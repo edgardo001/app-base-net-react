@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/ui/avatar-upload'
 import { User, KeyRound, Clock, Camera } from 'lucide-react'
 
 const profileSchema = z.object({
@@ -44,7 +45,7 @@ export function ProfilePage() {
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdError, setPwdError] = useState('')
   const [activityError, setActivityError] = useState('')
-  const [uploading, setUploading] = useState(false)
+  const [showAvatarModal, setShowAvatarModal] = useState(false)
 
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -90,21 +91,13 @@ export function ProfilePage() {
     }
   }
 
-  const uploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      await api.post(`/profile/avatar`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      setProfileMsg('Avatar actualizado')
-    } catch (err: unknown) {
-      setProfileMsg(getErrorMessage(err, 'Error al subir avatar'))
-    }
-    setUploading(false)
+  const uploadAvatar = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    await api.put(`/profile/avatar`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    setProfileMsg('Avatar actualizado')
   }
 
   return (
@@ -118,20 +111,18 @@ export function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="relative">
+              <button type="button" onClick={() => setShowAvatarModal(true)} className="relative group cursor-pointer">
                 <Avatar className="h-16 w-16">
                   {user?.avatarPath && <AvatarImage src={`/api/profile/avatar`} />}
                   <AvatarFallback className="text-lg">{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <label className="absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-primary p-1.5 text-primary-foreground shadow-sm hover:bg-primary/90">
-                  <Camera className="h-3 w-3" />
-                  <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={uploadAvatar} disabled={uploading} />
-                </label>
-              </div>
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="h-5 w-5 text-white" />
+                </span>
+              </button>
               <div>
                 <p className="font-medium">{user?.firstName} {user?.lastName}</p>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
-                {uploading && <p className="text-xs text-muted-foreground">Subiendo...</p>}
               </div>
             </div>
             {profileMsg && <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">{profileMsg}</div>}
@@ -209,6 +200,11 @@ export function ProfilePage() {
           )}
         </CardContent>
       </Card>
+      <AvatarUpload
+        open={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onUpload={uploadAvatar}
+      />
     </div>
   )
 }
