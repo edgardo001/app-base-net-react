@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
+import { useTheme } from '@/hooks/use-theme'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { PanelLeftOpen, PanelLeftClose, Menu, X } from 'lucide-react'
+import { PanelLeftOpen, PanelLeftClose, Menu, X, Moon, Sun } from 'lucide-react'
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
@@ -26,6 +27,7 @@ export function Header({ onToggleCollapse, onToggleMobile, sidebarCollapsed, mob
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const isDesktop = useIsDesktop()
+  const { theme, toggleTheme } = useTheme()
 
   return (
     <header className="flex h-14 items-center justify-between border-b px-6">
@@ -42,6 +44,9 @@ export function Header({ onToggleCollapse, onToggleMobile, sidebarCollapsed, mob
         </Button>
       )}
       <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
         <div className="flex items-center gap-2 text-sm">
           <Avatar className="h-8 w-8">
             <AvatarFallback>
