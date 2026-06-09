@@ -4,13 +4,15 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, UserCheck, UserPlus, Activity, RefreshCw } from 'lucide-react'
+import { Users, UserCheck, UserPlus, Activity, RefreshCw, KeyRound, AlertTriangle } from 'lucide-react'
 
 interface DashboardData {
   totalUsers: number
   activeUsers: number
   newUsersLast7Days: number
   inactiveUsers: number
+  expiredPasswords: number
+  expiringSoonPasswords: number
 }
 
 interface AuditEntry {
@@ -54,6 +56,8 @@ export function DashboardPage() {
     { title: 'Usuarios Activos', value: data?.activeUsers ?? '—', icon: UserCheck, color: 'text-green-600' },
     { title: 'Nuevos (7 días)', value: data?.newUsersLast7Days ?? '—', icon: UserPlus, color: 'text-purple-600' },
     { title: 'Usuarios Inactivos', value: data?.inactiveUsers ?? '—', icon: Activity, color: 'text-orange-600' },
+    { title: 'Contraseñas Expiradas', value: data?.expiredPasswords ?? '—', icon: AlertTriangle, color: 'text-red-600' },
+    { title: 'Contraseñas por Expirar (7d)', value: data?.expiringSoonPasswords ?? '—', icon: KeyRound, color: 'text-yellow-600' },
   ]
 
   return (
@@ -65,7 +69,7 @@ export function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {cards.map((c) => (
           <Card key={c.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

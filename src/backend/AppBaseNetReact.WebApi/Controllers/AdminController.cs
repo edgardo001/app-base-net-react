@@ -43,12 +43,22 @@ public class AdminController : ControllerBase
         var newUsersLast7Days = await _uow.Users.CountAsync(
             u => u.CreatedAt >= DateTime.UtcNow.AddDays(-7), ct);
 
+        var expiredPasswords = await _uow.Users.CountAsync(
+            u => u.IsActive && u.LastPasswordChangeAt == null, ct);
+        var expiringSoonPasswords = await _uow.Users.CountAsync(
+            u => u.IsActive
+                && u.LastPasswordChangeAt != null
+                && u.LastPasswordChangeAt.Value.AddDays(u.PasswordExpirationDays) <= DateTime.UtcNow.AddDays(7)
+                && u.LastPasswordChangeAt.Value.AddDays(u.PasswordExpirationDays) > DateTime.UtcNow, ct);
+
         return Ok(ApiResponse<object>.Ok(new
         {
             totalUsers,
             activeUsers,
             inactiveUsers,
-            newUsersLast7Days
+            newUsersLast7Days,
+            expiredPasswords,
+            expiringSoonPasswords
         }));
     }
 

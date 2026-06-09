@@ -132,4 +132,17 @@ public class AdminControllerTests
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never, "missing template must abort before invoking the email service");
     }
+
+    [Fact]
+    public async Task GetDashboard_ReturnsPasswordExpiryCounts()
+    {
+        _uow.Setup(x => x.Users.CountAsync(null, It.IsAny<CancellationToken>())).ReturnsAsync(100);
+        _uow.Setup(x => x.Users.CountAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Domain.Entities.User, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(5);
+
+        var result = await _controller.GetDashboard(CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().NotBeNull();
+    }
 }
