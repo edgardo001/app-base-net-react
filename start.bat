@@ -10,7 +10,7 @@ echo.
 docker ps --filter "name=mvp-postgres" --format "{{.Names}}" | findstr "mvp-postgres" >nul 2>&1
 if %errorlevel% neq 0 (
     echo [1/3] Starting PostgreSQL 18...
-    docker run -d --name mvp-postgres ^
+    docker run -tid --name mvp-postgres ^
         -e POSTGRES_DB=mvp-usuarios-db ^
         -e POSTGRES_USER=mvp-usuarios-db ^
         -e POSTGRES_PASSWORD=mvp-usuarios-dev-2024 ^
