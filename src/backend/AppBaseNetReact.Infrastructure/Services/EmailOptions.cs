@@ -11,6 +11,7 @@ public class EmailOptions
     public int RetryCount { get; set; } = 3;
     public int RetryDelaySeconds { get; set; } = 5;
     public bool QueueEnabled { get; set; }
+    public bool ForgotPasswordEnabled { get; set; } = true;
 }
 
 public class SmtpSettings
