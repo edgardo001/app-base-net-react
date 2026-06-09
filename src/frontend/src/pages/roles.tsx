@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, Shield, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Shield, RefreshCw, Users } from 'lucide-react'
 
 interface Role {
   id: string
@@ -37,6 +37,10 @@ export function RolesPage() {
   const [description, setDescription] = useState('')
   const [selectedPerms, setSelectedPerms] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [showUsersModal, setShowUsersModal] = useState(false)
+  const [selectedRoleName, setSelectedRoleName] = useState('')
+  const [roleUsers, setRoleUsers] = useState<{ id: string; email: string; firstName: string; lastName: string; isActive: boolean; lastLoginAt: string | null }[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   const fetchRoles = async () => {
     setLoading(true)
@@ -113,6 +117,19 @@ export function RolesPage() {
     setSelectedPerms(prev => prev.includes(permId) ? prev.filter(x => x !== permId) : [...prev, permId])
   }
 
+  const openUsersModal = async (role: Role) => {
+    setSelectedRoleName(role.name)
+    setLoadingUsers(true)
+    setShowUsersModal(true)
+    try {
+      const { data } = await api.get(`/roles/${role.id}/users`)
+      setRoleUsers(data.data || [])
+    } catch {
+      setRoleUsers([])
+    }
+    setLoadingUsers(false)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -147,6 +164,9 @@ export function RolesPage() {
             </CardHeader>
             <CardContent>
               <div className="flex justify-end gap-1">
+                <Button variant="ghost" size="sm" onClick={() => openUsersModal(r)}>
+                  <Users className="mr-1 h-4 w-4" /> Usuarios
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil className="mr-1 h-4 w-4" /> Editar</Button>
                 <Button variant="ghost" size="sm" onClick={() => deleteRole(r)} disabled={r.isSystem}>
                   <Trash2 className="mr-1 h-4 w-4 text-red-500" /> Eliminar
@@ -199,6 +219,39 @@ export function RolesPage() {
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
                 <Button onClick={save}>{editingId ? 'Guardar' : 'Crear'}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {showUsersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Usuarios con rol: {selectedRoleName}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingUsers ? (
+                <p className="text-sm text-muted-foreground">Cargando...</p>
+              ) : roleUsers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay usuarios con este rol</p>
+              ) : (
+                <div className="space-y-2">
+                  {roleUsers.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between rounded-md border p-3">
+                      <div>
+                        <p className="font-medium">{u.firstName} {u.lastName}</p>
+                        <p className="text-sm text-muted-foreground">{u.email}</p>
+                      </div>
+                      <Badge variant={u.isActive ? 'default' : 'secondary'}>
+                        {u.isActive ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-4 flex justify-end">
+                <Button variant="outline" onClick={() => setShowUsersModal(false)}>Cerrar</Button>
               </div>
             </CardContent>
           </Card>
