@@ -24,6 +24,7 @@ public class UsersControllerTests
     private readonly Mock<IRandomPasswordGenerator> _passwords = new();
     private readonly Mock<IMediator> _mediator = new();
     private readonly Mock<IAuditService> _audit = new();
+    private readonly Mock<IFileStorageService> _storage = new();
     private readonly EmailRenderer _renderer = new();
     private readonly EmailOptions _emailOptions = new()
     {
@@ -34,6 +35,12 @@ public class UsersControllerTests
             ["EmailResend"] = new() { Subject = "Confirma tu correo", TemplateFile = "email-resend.html" },
             ["TemporaryPassword"] = new() { Subject = "Contraseña temporal", TemplateFile = "temporary-password.html" }
         }
+    };
+    private readonly StorageOptions _storageOptions = new()
+    {
+        BasePath = "storage/avatars",
+        MaxFileSize = 5242880,
+        AllowedExtensions = [".jpg", ".jpeg", ".png", ".webp"]
     };
     private readonly UsersController _controller;
 
@@ -51,7 +58,7 @@ public class UsersControllerTests
 
         _controller = new UsersController(
             _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(_emailOptions),
-            _passwords.Object, _mediator.Object, _audit.Object);
+            _passwords.Object, _mediator.Object, _audit.Object, _storage.Object, Options.Create(_storageOptions));
 
         _controller.ControllerContext = new ControllerContext
         {
@@ -142,7 +149,7 @@ public class UsersControllerTests
         };
         var customController = new UsersController(
             _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(customOptions),
-            _passwords.Object, _mediator.Object, _audit.Object);
+            _passwords.Object, _mediator.Object, _audit.Object, _storage.Object, Options.Create(_storageOptions));
         customController.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -426,5 +433,89 @@ public class UsersControllerTests
 
         result.Should().BeOfType<NotFoundResult>();
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadAvatar_WhenExists_SavesFileAndUpdatesUser()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _storage.Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("avatar123.jpg");
+
+        var file = new FormFile(new MemoryStream("image content"u8.ToArray()), 0, 14, "file", "photo.jpg");
+        var result = await _controller.UploadAvatar(userId, file, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        user.AvatarPath.Should().Be("avatar123.jpg");
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadAvatar_WhenInvalidExtension_Returns400()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var file = new FormFile(new MemoryStream("data"u8.ToArray()), 0, 4, "file", "script.exe");
+        var result = await _controller.UploadAvatar(userId, file, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _storage.Verify(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadAvatar_WhenNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+
+        var file = new FormFile(new MemoryStream("data"u8.ToArray()), 0, 4, "file", "photo.jpg");
+        var result = await _controller.UploadAvatar(Guid.NewGuid(), file, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetAvatar_WhenExists_ReturnsFile()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        user.SetAvatar("avatar123.jpg");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var tempFile = Path.GetTempFileName();
+        File.WriteAllBytes(tempFile, "image bytes"u8.ToArray());
+        try
+        {
+            _storage.Setup(x => x.GetFilePathAsync("avatar123.jpg"))
+                .ReturnsAsync(tempFile);
+
+            var result = await _controller.GetAvatar(userId, CancellationToken.None);
+
+            result.Should().BeOfType<PhysicalFileResult>();
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task GetAvatar_WhenNoAvatar_ReturnsNotFound()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _controller.GetAvatar(userId, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 }

@@ -34,6 +34,8 @@ public class UsersController : ControllerBase
     private readonly IRandomPasswordGenerator _passwords;
     private readonly IMediator _mediator;
     private readonly IAuditService _audit;
+    private readonly IFileStorageService _storage;
+    private readonly StorageOptions _storageOptions;
 
     public UsersController(
         IUnitOfWork uow,
@@ -43,7 +45,9 @@ public class UsersController : ControllerBase
         IOptions<EmailOptions> emailOptions,
         IRandomPasswordGenerator passwords,
         IMediator mediator,
-        IAuditService audit)
+        IAuditService audit,
+        IFileStorageService storage,
+        IOptions<StorageOptions> storageOptions)
     {
         _uow = uow;
         _hasher = hasher;
@@ -53,6 +57,8 @@ public class UsersController : ControllerBase
         _passwords = passwords;
         _mediator = mediator;
         _audit = audit;
+        _storage = storage;
+        _storageOptions = storageOptions.Value;
     }
 
     [HttpGet]
@@ -251,6 +257,48 @@ public class UsersController : ControllerBase
             $"User '{user.Email}' soft-deleted", ct);
 
         return Ok(ApiResponse<object>.Ok("User deleted"));
+    }
+
+    [HttpPost("{id:guid}/avatar")]
+    [RequestSizeLimit(5242880)]
+    public async Task<IActionResult> UploadAvatar(Guid id, IFormFile file, CancellationToken ct)
+    {
+        var user = await _uow.Users.GetByIdAsync(id, ct);
+        if (user == null) return NotFound();
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!_storageOptions.AllowedExtensions.Contains(ext))
+            return BadRequest(ApiResponse<object>.Fail($"File type not allowed. Allowed: {string.Join(", ", _storageOptions.AllowedExtensions)}"));
+
+        if (file.Length > _storageOptions.MaxFileSize)
+            return BadRequest(ApiResponse<object>.Fail($"File size exceeds maximum of {_storageOptions.MaxFileSize} bytes"));
+
+        var fileName = await _storage.SaveFileAsync(file.OpenReadStream(), ext, ct);
+        user.SetAvatar(fileName);
+        await _uow.SaveChangesAsync(ct);
+
+        return Ok(ApiResponse<object>.Ok(new { fileName }));
+    }
+
+    [HttpGet("{id:guid}/avatar")]
+    public async Task<IActionResult> GetAvatar(Guid id, CancellationToken ct)
+    {
+        var user = await _uow.Users.GetByIdAsync(id, ct);
+        if (user == null) return NotFound();
+        if (string.IsNullOrEmpty(user.AvatarPath)) return NotFound(ApiResponse<object>.Fail("No avatar set"));
+
+        var filePath = await _storage.GetFilePathAsync(user.AvatarPath);
+        if (filePath == null) return NotFound(ApiResponse<object>.Fail("Avatar file not found"));
+
+        var contentType = Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+
+        return PhysicalFile(filePath, contentType);
     }
 
     private Guid? GetCurrentUserId()
