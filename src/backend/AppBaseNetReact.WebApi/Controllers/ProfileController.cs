@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Validators;
 using AppBaseNetReact.WebApi.Filters;
@@ -13,11 +14,15 @@ public class ProfileController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
     private readonly IAuditService _audit;
+    private readonly IFileStorageService _storage;
+    private readonly StorageOptions _storageOptions;
 
-    public ProfileController(IUnitOfWork uow, IAuditService audit)
+    public ProfileController(IUnitOfWork uow, IAuditService audit, IFileStorageService storage, IOptions<StorageOptions> storageOptions)
     {
         _uow = uow;
         _audit = audit;
+        _storage = storage;
+        _storageOptions = storageOptions.Value;
     }
 
 [HttpGet]
@@ -86,5 +91,30 @@ public async Task<IActionResult> GetActivity(CancellationToken ct)
             Request.Headers.UserAgent.ToString(), null, ct);
 
         return Ok(ApiResponse<object>.Ok("Profile updated"));
+    }
+
+    [HttpPut("avatar")]
+    [RequestSizeLimit(5242880)]
+    public async Task<IActionResult> UploadAvatar(IFormFile file, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirst("sub")?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var user = await _uow.Users.GetByIdAsync(userId, ct);
+        if (user == null) return NotFound();
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!_storageOptions.AllowedExtensions.Contains(ext))
+            return BadRequest(ApiResponse<object>.Fail($"File type not allowed. Allowed: {string.Join(", ", _storageOptions.AllowedExtensions)}"));
+
+        if (file.Length > _storageOptions.MaxFileSize)
+            return BadRequest(ApiResponse<object>.Fail($"File size exceeds maximum of {_storageOptions.MaxFileSize} bytes"));
+
+        var fileName = await _storage.SaveFileAsync(file.OpenReadStream(), ext, ct);
+        user.SetAvatar(fileName);
+        await _uow.SaveChangesAsync(ct);
+
+        return Ok(ApiResponse<object>.Ok(new { fileName }));
     }
 }
