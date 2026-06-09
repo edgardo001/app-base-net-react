@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send } from 'lucide-react'
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound } from 'lucide-react'
 
 interface User {
   id: string
@@ -47,6 +47,8 @@ export function UsersPage() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [resendFeedback, setResendFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
+  const [resetId, setResetId] = useState<string | null>(null)
+  const [resetFeedback, setResetFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
   const pageSize = 10
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserForm>({
@@ -108,6 +110,24 @@ export function UsersPage() {
   const toggleActive = async (id: string, active: boolean) => {
     await api.patch(`/users/${id}/activate`, { active: !active })
     fetchUsers()
+  }
+
+  const resetPassword = async (id: string) => {
+    if (!window.confirm('¿Estás seguro? Se generará una nueva contraseña temporal y se enviará al correo del usuario.')) return
+    setResetId(id)
+    setResetFeedback(null)
+    try {
+      await api.patch(`/users/${id}/reset-password`)
+      setResetFeedback({ id, type: 'ok', msg: 'Contraseña restablecida — correo enviado' })
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? 'Error al restablecer contraseña')
+        : 'Error al restablecer contraseña'
+      setResetFeedback({ id, type: 'err', msg })
+    } finally {
+      setResetId(null)
+      setTimeout(() => setResetFeedback(null), 4000)
+    }
   }
 
   const resendOnboardingEmail = async (id: string) => {
@@ -202,10 +222,26 @@ export function UsersPage() {
                                 : <Send className="h-4 w-4 text-blue-500" />}
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => resetPassword(u.id)}
+                            disabled={resetId === u.id}
+                            title="Restablecer contraseña"
+                          >
+                            {resetId === u.id
+                              ? <RefreshCw className="h-4 w-4 animate-spin" />
+                              : <KeyRound className="h-4 w-4 text-orange-500" />}
+                          </Button>
                         </div>
                         {resendFeedback?.id === u.id && (
                           <p className={`text-xs ${resendFeedback.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
                             {resendFeedback.msg}
+                          </p>
+                        )}
+                        {resetFeedback?.id === u.id && (
+                          <p className={`text-xs ${resetFeedback.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
+                            {resetFeedback.msg}
                           </p>
                         )}
                       </div>

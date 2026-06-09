@@ -35,7 +35,7 @@ dotnet run --project src/backend/AppBaseNetReact.WebApi --launch-profile http
 cd src/frontend && npm run dev
 ```
 - API: `http://localhost:5011/api/...` — Scalar UI: `/scalar/v1`
-- Admin: `admin` / `admin` (force password change on first login)
+- Admin: `admin@sistema.local` / `admin` (force password change on first login)
 - DB + seed data auto-applied on startup
 - Frontend proxies `/api` → `http://localhost:5011`
 

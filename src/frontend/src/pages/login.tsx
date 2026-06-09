@@ -1,6 +1,7 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
+import api from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgotEnabled, setForgotEnabled] = useState(true)
+
+  useEffect(() => {
+    api.get('/features').then(({ data }) => {
+      setForgotEnabled(data.forgotPasswordEnabled !== false)
+    }).catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -68,11 +76,13 @@ export function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>
-            <div className="text-center text-sm">
-              <Link to="/forgot-password" className="text-primary hover:underline">
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
+            {forgotEnabled && (
+              <div className="text-center text-sm">
+                <Link to="/forgot-password" className="text-primary hover:underline">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>

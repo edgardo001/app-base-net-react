@@ -37,8 +37,8 @@ echo   Backend:   http://localhost:5011
 echo   Scalar UI: http://localhost:5011/scalar/v1
 echo   Frontend:  http://localhost:5173
 echo.
-echo   Login: admin
-echo   Pass:  admin
+echo   Login: admin@sistema.local
+echo   Pass:  admin (solo primer inicio)
 echo ========================================
 echo.
 pause

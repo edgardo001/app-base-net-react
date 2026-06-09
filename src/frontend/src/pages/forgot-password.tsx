@@ -1,5 +1,5 @@
-import { type FormEvent, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { type FormEvent, useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,10 +8,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import api from '@/lib/api'
 
 export function ForgotPasswordPage() {
+  const navigate = useNavigate()
+  const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    api.get('/features').then(({ data }) => {
+      if (data.forgotPasswordEnabled === false) navigate('/login', { replace: true })
+      else setChecking(false)
+    }).catch(() => setChecking(false))
+  }, [navigate])
+
+  if (checking) return null
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
