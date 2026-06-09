@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { PanelLeftOpen, PanelLeftClose, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import {
   LayoutDashboard,
   Users,
@@ -29,7 +29,6 @@ const navItems = [
 interface SidebarProps {
   collapsed: boolean
   mobileOpen: boolean
-  onToggleCollapse: () => void
   onToggleMobile: () => void
   onCloseMobile: () => void
 }
@@ -69,7 +68,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   )
 }
 
-export function Sidebar({ collapsed, mobileOpen, onToggleCollapse, onToggleMobile, onCloseMobile }: SidebarProps) {
+export function Sidebar({ collapsed, mobileOpen, onToggleMobile, onCloseMobile }: SidebarProps) {
   return (
     <>
       {/* Móvil: botón hamburguesa flotante */}
@@ -82,21 +81,13 @@ export function Sidebar({ collapsed, mobileOpen, onToggleCollapse, onToggleMobil
         {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </Button>
 
-      {/* Desktop: sidebar inline con botón de colapsar */}
+      {/* Desktop: sidebar inline */}
       <aside className={cn(
         'hidden flex-col border-r bg-sidebar md:flex',
         collapsed ? 'w-16' : 'w-64',
         'transition-all duration-300',
       )}>
-        <div className="flex items-center justify-end p-2">
-          <Button variant="ghost" size="icon" onClick={onToggleCollapse}>
-            {collapsed
-              ? <PanelLeftOpen className="h-4 w-4" />
-              : <PanelLeftClose className="h-4 w-4" />
-            }
-          </Button>
-        </div>
-        <div className="flex-1 px-4 pb-4">
+        <div className="flex-1 px-4 pt-4 pb-4">
           <SidebarContent collapsed={collapsed} />
         </div>
       </aside>
