@@ -39,4 +39,4 @@
 - [x] 5.3 Unit tests for `POST /api/auth/forgot-password` — email sent, no temp password in response, anti-enumeration
 - [x] 5.4 Unit tests for `POST /api/auth/reset-password` — valid token, expired token, invalid token, password policy (via AuthController tests that include confirm-email patterns)
 - [x] 5.5 Unit tests for `POST /api/auth/confirm-email` — valid token, expired token, invalid token
-- [ ] 5.6 Integration test — forgot → reset flow end-to-end (requires PostgreSQL Testcontainer)
+- [x] 5.6 Integration test — forgot → reset flow end-to-end (requires PostgreSQL Testcontainer)
