@@ -37,7 +37,7 @@ public class ResetPasswordCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithValidToken_ResetsPasswordAndForcesChangeAndPublishes()
+    public async Task Handle_WithValidToken_ResetsPasswordAndConfirmsEmail()
     {
         var user = CreateUserWithToken(DateTime.UtcNow.AddHours(24));
         _uow.Setup(x => x.Users.GetByEmailConfirmationTokenAsync("valid-token", It.IsAny<CancellationToken>()))
@@ -48,7 +48,7 @@ public class ResetPasswordCommandHandlerTests
 
         outcome.Result.ErrorCode.Should().Be(PasswordErrorCode.None);
         user.EmailConfirmed.Should().BeTrue();
-        user.LastPasswordChangeAt.Should().BeNull();
+        user.LastPasswordChangeAt.Should().NotBeNull();
         _mediator.Verify(x => x.Publish(
             It.Is<PasswordResetNotification>(n => n.UserId == user.Id),
             It.IsAny<CancellationToken>()), Times.Once);

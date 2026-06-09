@@ -48,7 +48,6 @@ public sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordC
                 PasswordResult.Fail(PasswordErrorCode.WeakPassword, error));
 
         user.SetPasswordHash(_hasher.HashPassword(request.NewPassword));
-        user.ForcePasswordChange();
         user.ConfirmEmail();
         await _uow.SaveChangesAsync(ct);
 
