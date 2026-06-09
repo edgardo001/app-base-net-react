@@ -34,13 +34,21 @@ public sealed class RandomPasswordGenerator : IRandomPasswordGenerator
         for (var i = 0; i < length; i++)
             buffer[i] = AllChars[RandomNumberGenerator.GetInt32(AllChars.Length)];
 
-        // Overwrite a random position with each required class to
-        // guarantee the policy without reducing overall entropy
-        // (the policy bits are not added to entropy, they only
-        // narrow the charset).
-        buffer[RandomNumberGenerator.GetInt32(length)] = UpperChars[RandomNumberGenerator.GetInt32(UpperChars.Length)];
-        buffer[RandomNumberGenerator.GetInt32(length)] = LowerChars[RandomNumberGenerator.GetInt32(LowerChars.Length)];
-        buffer[RandomNumberGenerator.GetInt32(length)] = DigitChars[RandomNumberGenerator.GetInt32(DigitChars.Length)];
+        // Overwrite three distinct random positions with each required
+        // class to guarantee the policy without reducing overall entropy.
+        // Using a shuffle of indices [0..length-1) ensures no two
+        // required-class writes land on the same position.
+        Span<int> indices = stackalloc int[length];
+        for (var i = 0; i < length; i++) indices[i] = i;
+        // Fisher-Yates partial shuffle for first 3 elements
+        for (var i = 0; i < 3; i++)
+        {
+            var j = RandomNumberGenerator.GetInt32(i, length);
+            (indices[i], indices[j]) = (indices[j], indices[i]);
+        }
+        buffer[indices[0]] = UpperChars[RandomNumberGenerator.GetInt32(UpperChars.Length)];
+        buffer[indices[1]] = LowerChars[RandomNumberGenerator.GetInt32(LowerChars.Length)];
+        buffer[indices[2]] = DigitChars[RandomNumberGenerator.GetInt32(DigitChars.Length)];
 
         return new string(buffer);
     }
