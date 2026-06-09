@@ -14,6 +14,8 @@ using AppBaseNetReact.Application.Features.Auth.Commands.Login;
 using AppBaseNetReact.Application.Features.Auth.Commands.Logout;
 using AppBaseNetReact.Application.Features.Auth.Commands.Refresh;
 using AppBaseNetReact.Application.Features.Auth.Commands.ResetPassword;
+using Microsoft.Extensions.Options;
+using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Controllers;
 using AppBaseNetReact.WebApi.Filters;
 
@@ -35,7 +37,8 @@ public class AuthControllerTests
             })
             .Build();
 
-        _controller = new AuthController(_mediator.Object, config);
+        var emailOptions = Options.Create(new EmailOptions { ForgotPasswordEnabled = true });
+        _controller = new AuthController(_mediator.Object, config, emailOptions);
 
         var claims = new[] { new Claim("sub", _userId.ToString()) };
         _controller.ControllerContext = new ControllerContext

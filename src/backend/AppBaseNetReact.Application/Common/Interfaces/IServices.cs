@@ -20,6 +20,7 @@ public interface IEmailService
     Task SendAccountLockedEmailAsync(string to, string userName, int lockoutMinutes, string resetLink, CancellationToken ct = default);
     Task SendPasswordChangedEmailAsync(string to, string userName, CancellationToken ct = default);
     Task SendWelcomeEmailAsync(string to, string userName, string loginLink, CancellationToken ct = default);
+    Task SendPasswordResetEmailAsync(string to, string userName, string resetLink, CancellationToken ct = default);
 }
 
 public interface ICaptchaService

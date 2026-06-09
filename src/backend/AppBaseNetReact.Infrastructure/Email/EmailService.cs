@@ -114,6 +114,26 @@ public class EmailService : IEmailService
         await SendEmailAsync(to, config.Subject, htmlBody, ct);
     }
 
+    public async Task SendPasswordResetEmailAsync(
+        string to, string userName, string resetLink, CancellationToken ct = default)
+    {
+        if (!_options.Templates.TryGetValue("PasswordReset", out var config))
+        {
+            _logger.LogWarning("PasswordReset template not configured; skipping email to {To}", to);
+            return;
+        }
+
+        var vars = new Dictionary<string, string>
+        {
+            ["UserName"] = userName,
+            ["ResetLink"] = resetLink,
+            ["Year"] = DateTime.UtcNow.Year.ToString()
+        };
+
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+        await SendEmailAsync(to, config.Subject, htmlBody, ct);
+    }
+
     public async Task SendWelcomeEmailAsync(
         string to, string userName, string loginLink, CancellationToken ct = default)
     {

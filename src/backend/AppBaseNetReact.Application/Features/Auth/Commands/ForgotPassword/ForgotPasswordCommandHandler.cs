@@ -35,9 +35,12 @@ public sealed class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswor
         user.SetEmailConfirmationToken(resetToken, _clock.UtcNow.Add(ResetTokenLifetime));
         await _uow.SaveChangesAsync(ct);
 
+        var frontendUrl = (request.FrontendUrl ?? "http://localhost:5173").TrimEnd('/');
+        var resetLink = $"{frontendUrl}/reset-password?token={resetToken}";
+
         await _mediator.Publish(
             new PasswordResetRequestedNotification(
-                user.Id, user.Email, user.FirstName,
+                user.Id, user.Email, user.FirstName, resetLink,
                 request.IpAddress ?? "unknown", request.UserAgent ?? "unknown"),
             ct);
 

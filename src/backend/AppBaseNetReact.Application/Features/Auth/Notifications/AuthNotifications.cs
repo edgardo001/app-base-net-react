@@ -49,6 +49,7 @@ public sealed record PasswordResetRequestedNotification(
     Guid UserId,
     string Email,
     string FirstName,
+    string ResetLink,
     string IpAddress,
     string UserAgent) : INotification;
 

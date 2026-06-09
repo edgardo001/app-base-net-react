@@ -32,13 +32,14 @@ public class ForgotPasswordCommandHandlerTests
             .ReturnsAsync(user);
 
         var outcome = await _handler.Handle(
-            new ForgotPasswordCommand("u@test.com", "127.0.0.1", "ua"), CancellationToken.None);
+            new ForgotPasswordCommand("u@test.com", "127.0.0.1", "ua", "http://localhost:5173"), CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(PasswordErrorCode.None);
         user.EmailConfirmationToken.Should().NotBeNullOrEmpty();
         user.EmailConfirmationTokenExpires.Should().BeAfter(DateTime.UtcNow);
         _mediator.Verify(x => x.Publish(
-            It.Is<PasswordResetRequestedNotification>(n => n.UserId == user.Id),
+            It.Is<PasswordResetRequestedNotification>(n =>
+                n.UserId == user.Id && n.ResetLink.Contains("reset-password") && n.ResetLink.Contains(user.EmailConfirmationToken)),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -49,7 +50,7 @@ public class ForgotPasswordCommandHandlerTests
             .ReturnsAsync((User?)null);
 
         var outcome = await _handler.Handle(
-            new ForgotPasswordCommand("ghost@test.com", "127.0.0.1", "ua"), CancellationToken.None);
+            new ForgotPasswordCommand("ghost@test.com", "127.0.0.1", "ua", null), CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(PasswordErrorCode.None);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -66,11 +67,12 @@ public class ForgotPasswordCommandHandlerTests
             .ReturnsAsync(user);
 
         await _handler.Handle(
-            new ForgotPasswordCommand("u@test.com", "10.0.0.1", "MyAgent/1.0"), CancellationToken.None);
+            new ForgotPasswordCommand("u@test.com", "10.0.0.1", "MyAgent/1.0", "http://localhost:5173"), CancellationToken.None);
 
         _mediator.Verify(x => x.Publish(
             It.Is<PasswordResetRequestedNotification>(n =>
-                n.IpAddress == "10.0.0.1" && n.UserAgent == "MyAgent/1.0"),
+                n.IpAddress == "10.0.0.1" && n.UserAgent == "MyAgent/1.0" &&
+                n.ResetLink.StartsWith("http://localhost:5173/reset-password?token=")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

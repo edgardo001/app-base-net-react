@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using AppBaseNetReact.Application.Common.Models;
 using AppBaseNetReact.Application.Common.Validators;
 using AppBaseNetReact.Application.Features.Auth.Commands.ChangePassword;
@@ -11,6 +12,7 @@ using AppBaseNetReact.Application.Features.Auth.Commands.Login;
 using AppBaseNetReact.Application.Features.Auth.Commands.Logout;
 using AppBaseNetReact.Application.Features.Auth.Commands.Refresh;
 using AppBaseNetReact.Application.Features.Auth.Commands.ResetPassword;
+using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -21,11 +23,13 @@ public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly string _frontendUrl;
+    private readonly EmailOptions _emailOptions;
 
-    public AuthController(IMediator mediator, IConfiguration configuration)
+    public AuthController(IMediator mediator, IConfiguration configuration, IOptions<EmailOptions> emailOptions)
     {
         _mediator = mediator;
         _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
+        _emailOptions = emailOptions.Value;
     }
 
     [HttpPost("login")]
@@ -128,10 +132,14 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("ForgotPassword")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
     {
+        if (!_emailOptions.ForgotPasswordEnabled)
+            return NotFound(ApiResponse<object>.Fail("This feature is not available"));
+
         var command = new ForgotPasswordCommand(
             request.Email,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+            Request.Headers.UserAgent.ToString(),
+            _frontendUrl);
 
         await _mediator.Send(command, ct);
 
