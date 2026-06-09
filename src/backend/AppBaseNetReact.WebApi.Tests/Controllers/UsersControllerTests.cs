@@ -23,6 +23,7 @@ public class UsersControllerTests
     private readonly Mock<IEmailService> _email = new();
     private readonly Mock<IRandomPasswordGenerator> _passwords = new();
     private readonly Mock<IMediator> _mediator = new();
+    private readonly Mock<IAuditService> _audit = new();
     private readonly EmailRenderer _renderer = new();
     private readonly EmailOptions _emailOptions = new()
     {
@@ -50,7 +51,7 @@ public class UsersControllerTests
 
         _controller = new UsersController(
             _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(_emailOptions),
-            _passwords.Object, _mediator.Object);
+            _passwords.Object, _mediator.Object, _audit.Object);
 
         _controller.ControllerContext = new ControllerContext
         {
@@ -141,7 +142,7 @@ public class UsersControllerTests
         };
         var customController = new UsersController(
             _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(customOptions),
-            _passwords.Object, _mediator.Object);
+            _passwords.Object, _mediator.Object, _audit.Object);
         customController.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -394,5 +395,36 @@ public class UsersControllerTests
         result.Should().BeOfType<OkObjectResult>();
         refreshTokens.Verify(x => x.RevokeAllForUserAsync(userId, null, It.IsAny<CancellationToken>()), Times.Once);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteUser_WhenExists_ReturnsOk()
+    {
+        var userId = Guid.NewGuid();
+        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
+        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _controller.DeleteUser(userId, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(x => x.LogAsync(
+            "UserDeleted", "User", userId.ToString(),
+            null, null, It.IsAny<Guid?>(),
+            It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteUser_WhenNotExists_ReturnsNotFound()
+    {
+        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+
+        var result = await _controller.DeleteUser(Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

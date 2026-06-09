@@ -33,6 +33,7 @@ public class UsersController : ControllerBase
     private readonly EmailOptions _emailOptions;
     private readonly IRandomPasswordGenerator _passwords;
     private readonly IMediator _mediator;
+    private readonly IAuditService _audit;
 
     public UsersController(
         IUnitOfWork uow,
@@ -41,7 +42,8 @@ public class UsersController : ControllerBase
         EmailRenderer renderer,
         IOptions<EmailOptions> emailOptions,
         IRandomPasswordGenerator passwords,
-        IMediator mediator)
+        IMediator mediator,
+        IAuditService audit)
     {
         _uow = uow;
         _hasher = hasher;
@@ -50,6 +52,7 @@ public class UsersController : ControllerBase
         _emailOptions = emailOptions.Value;
         _passwords = passwords;
         _mediator = mediator;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -225,6 +228,36 @@ public class UsersController : ControllerBase
         await _uow.RefreshTokens.RevokeAllForUserAsync(id, null, ct);
         await _uow.SaveChangesAsync(ct);
         return Ok(ApiResponse<object>.Ok("All sessions revoked for user"));
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteUser(Guid id, CancellationToken ct)
+    {
+        var user = await _uow.Users.GetByIdAsync(id, ct);
+        if (user == null) return NotFound();
+
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == id)
+            return BadRequest(ApiResponse<object>.Fail("Cannot delete yourself"));
+
+        user.SoftDelete(currentUserId);
+        await _uow.SaveChangesAsync(ct);
+
+        await _audit.LogAsync(
+            "UserDeleted", "User", id.ToString(),
+            null, null, currentUserId,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString(),
+            $"User '{user.Email}' soft-deleted", ct);
+
+        return Ok(ApiResponse<object>.Ok("User deleted"));
+    }
+
+    private Guid? GetCurrentUserId()
+    {
+        var sub = User.FindFirst("sub")?.Value;
+        if (Guid.TryParse(sub, out var id)) return id;
+        return null;
     }
 
     private async Task SendEmail(Domain.Entities.User user, string templateName, Dictionary<string, string> extraVars, CancellationToken ct)
