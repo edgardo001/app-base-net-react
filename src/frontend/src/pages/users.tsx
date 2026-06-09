@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound, ArrowUpDown, ArrowUp, ArrowDown, Camera } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/ui/avatar-upload'
 
 interface User {
   id: string
@@ -53,6 +55,7 @@ export function UsersPage() {
   const [resetId, setResetId] = useState<string | null>(null)
   const [resetFeedback, setResetFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
   const [error, setError] = useState('')
+  const [showAvatarModal, setShowAvatarModal] = useState(false)
   const pageSize = 10
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserForm>({
@@ -159,6 +162,15 @@ export function UsersPage() {
   }
 
   const totalPages = Math.ceil(total / pageSize)
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!editingId) return
+    const formData = new FormData()
+    formData.append('file', file)
+    await api.post(`/users/${editingId}/avatar`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -378,6 +390,17 @@ export function UsersPage() {
                     ))}
                   </div>
                 </div>
+                {editingId && (
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={`/api/users/${editingId}/avatar`} />
+                      <AvatarFallback className="text-sm">?</AvatarFallback>
+                    </Avatar>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setShowAvatarModal(true)}>
+                      <Camera className="mr-1 h-3.5 w-3.5" /> Cambiar avatar
+                    </Button>
+                  </div>
+                )}
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" type="button" onClick={() => setShowModal(false)}>Cancelar</Button>
                   <Button type="submit">{editingId ? 'Guardar' : 'Crear'}</Button>
@@ -387,6 +410,11 @@ export function UsersPage() {
           </Card>
         </div>
       )}
+      <AvatarUpload
+        open={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onUpload={handleAvatarUpload}
+      />
     </div>
   )
 }
