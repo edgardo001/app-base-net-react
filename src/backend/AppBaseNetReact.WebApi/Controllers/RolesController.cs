@@ -1,8 +1,14 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Validators;
-using AppBaseNetReact.Domain.Entities;
+using AppBaseNetReact.Application.Features.Roles.Commands.CreateRole;
+using AppBaseNetReact.Application.Features.Roles.Commands.UpdateRole;
+using AppBaseNetReact.Application.Features.Roles.Commands.DeleteRole;
+using AppBaseNetReact.Application.Features.Roles.Commands.UpdatePermissions;
+using AppBaseNetReact.Application.Features.Roles.Queries.GetRoles;
+using AppBaseNetReact.Application.Features.Roles.Queries.GetRole;
+using AppBaseNetReact.Application.Features.Roles.Queries.GetUsersByRole;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -12,95 +18,55 @@ namespace AppBaseNetReact.WebApi.Controllers;
 [Authorize]
 public class RolesController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IAuditService _audit;
+    private readonly IMediator _mediator;
 
-    public RolesController(IUnitOfWork uow, IAuditService audit)
+    public RolesController(IMediator mediator)
     {
-        _uow = uow;
-        _audit = audit;
+        _mediator = mediator;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetRoles(CancellationToken ct)
     {
-        var roles = await _uow.Roles.GetAllAsync(ct);
-        return Ok(ApiResponse<List<RoleDetailDto>>.Ok(roles.Select(r => new RoleDetailDto
-        {
-            Id = r.Id,
-            Name = r.Name,
-            Description = r.Description,
-            IsSystem = r.IsSystem,
-            CreatedAt = r.CreatedAt
-        }).ToList()));
+        var result = await _mediator.Send(new GetRolesQuery(), ct);
+        return Ok(ApiResponse<GetRolesResponse>.Ok(result));
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetRole(Guid id, CancellationToken ct)
     {
-        var role = await _uow.Roles.GetByIdWithPermissionsAsync(id, ct);
-        if (role == null) return NotFound();
+        var result = await _mediator.Send(new GetRoleQuery(id), ct);
+        if (result == null) return NotFound();
 
-        return Ok(ApiResponse<object>.Ok(new
-        {
-            role.Id,
-            role.Name,
-            role.Description,
-            role.IsSystem,
-            role.CreatedAt,
-            Permissions = role.RolePermissions.Select(rp => new
-            {
-                rp.Permission.Id,
-                rp.Permission.Code,
-                rp.Permission.Name,
-                rp.Permission.Module,
-                rp.Granted
-            })
-        }));
+        return Ok(ApiResponse<GetRoleResponse>.Ok(result));
     }
 
     [HttpPost]
     public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequest request, CancellationToken ct)
     {
-        var existing = await _uow.Roles.GetByNameAsync(request.Name, ct);
-        if (existing != null)
-            return Conflict(ApiResponse<object>.Fail("Role name already exists"));
-
-        var role = Role.Create(request.Name, request.Description);
-        await _uow.Roles.AddAsync(role, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        await _audit.LogAsync(
-            "RoleCreated", "Role", role.Id.ToString(),
-            null, null, GetCurrentUserId(),
+        var outcome = await _mediator.Send(new CreateRoleCommand(
+            request.Name, request.Description,
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(),
-            $"Role '{role.Name}' created", ct);
+            Request.Headers.UserAgent.ToString()), ct);
 
-        return CreatedAtAction(nameof(GetRole), new { id = role.Id },
-            ApiResponse<object>.Ok(new { role.Id, role.Name }));
+        if (outcome.Result.ErrorCode == "DuplicateName")
+            return Conflict(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!));
+
+        return CreatedAtAction(nameof(GetRole), new { id = outcome.Result.RoleId },
+            ApiResponse<object>.Ok(new { outcome.Result.RoleId, outcome.Result.Name }));
     }
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateRole(Guid id, [FromBody] UpdateRoleRequest request, CancellationToken ct)
     {
-        var role = await _uow.Roles.GetByIdAsync(id, ct);
-        if (role == null) return NotFound();
-        if (role.IsSystem)
-            return UnprocessableEntity(ApiResponse<object>.Fail("Cannot modify system roles"));
-
-        var oldName = role.Name;
-        role.Update(request.Name, request.Description);
-        await _uow.SaveChangesAsync(ct);
-
-        await _audit.LogAsync(
-            "RoleUpdated", "Role", role.Id.ToString(),
-            System.Text.Json.JsonSerializer.Serialize(new { Name = oldName }),
-            System.Text.Json.JsonSerializer.Serialize(new { role.Name, role.Description }),
-            GetCurrentUserId(),
+        var outcome = await _mediator.Send(new UpdateRoleCommand(
+            id, request.Name, request.Description,
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(),
-            $"Role '{oldName}' updated to '{role.Name}'", ct);
+            Request.Headers.UserAgent.ToString()), ct);
+
+        if (outcome.Result.ErrorCode == "NotFound") return NotFound();
+        if (outcome.Result.ErrorCode == "CannotModifySystemRole")
+            return UnprocessableEntity(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!));
 
         return Ok(ApiResponse<object>.Ok("Role updated"));
     }
@@ -108,21 +74,14 @@ public class RolesController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteRole(Guid id, CancellationToken ct)
     {
-        var role = await _uow.Roles.GetByIdAsync(id, ct);
-        if (role == null) return NotFound();
-        if (role.IsSystem)
-            return UnprocessableEntity(ApiResponse<object>.Fail("Cannot delete system roles"));
-
-        var roleName = role.Name;
-        await _uow.Roles.DeleteAsync(role, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        await _audit.LogAsync(
-            "RoleDeleted", "Role", id.ToString(),
-            null, null, GetCurrentUserId(),
+        var outcome = await _mediator.Send(new DeleteRoleCommand(
+            id, GetCurrentUserId(),
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(),
-            $"Role '{roleName}' deleted", ct);
+            Request.Headers.UserAgent.ToString()), ct);
+
+        if (outcome.Result.ErrorCode == "NotFound") return NotFound();
+        if (outcome.Result.ErrorCode == "CannotDeleteSystemRole")
+            return UnprocessableEntity(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!));
 
         return Ok(ApiResponse<object>.Ok("Role deleted"));
     }
@@ -130,25 +89,13 @@ public class RolesController : ControllerBase
     [HttpPatch("{id:guid}/permissions")]
     public async Task<IActionResult> UpdatePermissions(Guid id, [FromBody] UpdatePermissionsRequest request, CancellationToken ct)
     {
-        var role = await _uow.Roles.GetByIdWithPermissionsAsync(id, ct);
-        if (role == null) return NotFound();
-
-        role.RolePermissions.Clear();
-
-        foreach (var p in request.Permissions)
-        {
-            role.RolePermissions.Add(RolePermission.Create(id, p.PermissionId, p.Granted));
-        }
-
-        await _uow.SaveChangesAsync(ct);
-
-        await _audit.LogAsync(
-            "RolePermissionsUpdated", "Role", id.ToString(),
-            null, System.Text.Json.JsonSerializer.Serialize(request.Permissions),
-            GetCurrentUserId(),
+        var outcome = await _mediator.Send(new UpdatePermissionsCommand(
+            id,
+            request.Permissions.Select(p => new PermissionAssignmentDto(p.PermissionId, p.Granted)).ToList(),
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(),
-            $"Permissions updated for role '{role.Name}'", ct);
+            Request.Headers.UserAgent.ToString()), ct);
+
+        if (outcome.Result.ErrorCode == "NotFound") return NotFound();
 
         return Ok(ApiResponse<object>.Ok("Permissions updated"));
     }
@@ -156,19 +103,10 @@ public class RolesController : ControllerBase
     [HttpGet("{id:guid}/users")]
     public async Task<IActionResult> GetUsersByRole(Guid id, CancellationToken ct)
     {
-        var role = await _uow.Roles.GetByIdAsync(id, ct);
-        if (role == null) return NotFound();
+        var result = await _mediator.Send(new GetUsersByRoleQuery(id), ct);
+        if (result == null) return NotFound();
 
-        var users = await _uow.Users.GetUsersByRoleAsync(id, ct);
-        return Ok(ApiResponse<List<UserByRoleDto>>.Ok(users.Select(u => new UserByRoleDto
-        {
-            Id = u.Id,
-            Email = u.Email,
-            FirstName = u.FirstName,
-            LastName = u.LastName,
-            IsActive = u.IsActive,
-            LastLoginAt = u.LastLoginAt
-        }).ToList()));
+        return Ok(ApiResponse<GetUsersByRoleResponse>.Ok(result));
     }
 
     private Guid? GetCurrentUserId()
@@ -177,25 +115,4 @@ public class RolesController : ControllerBase
         if (Guid.TryParse(sub, out var id)) return id;
         return null;
     }
-}
-
-public class RoleDetailDto
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public bool IsSystem { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
-// Types defined in AppBaseNetReact.Application.Common.Validators
-
-public class UserByRoleDto
-{
-    public Guid Id { get; set; }
-    public string Email { get; set; } = string.Empty;
-    public string FirstName { get; set; } = string.Empty;
-    public string LastName { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-    public DateTime? LastLoginAt { get; set; }
 }
