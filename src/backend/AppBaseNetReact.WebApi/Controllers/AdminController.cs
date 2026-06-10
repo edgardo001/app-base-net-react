@@ -1,8 +1,11 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using AppBaseNetReact.Application.Common.Interfaces;
-using AppBaseNetReact.Domain.Entities;
+using AppBaseNetReact.Application.Features.Admin.Commands.RevokeAllTokens;
+using AppBaseNetReact.Application.Features.Admin.Commands.SendTestEmail;
+using AppBaseNetReact.Application.Features.Admin.Queries.GetAuditLog;
+using AppBaseNetReact.Application.Features.Admin.Queries.GetDashboard;
 using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Filters;
@@ -14,22 +17,16 @@ namespace AppBaseNetReact.WebApi.Controllers;
 [Authorize(Roles = "SuperAdmin,Admin")]
 public class AdminController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IAuditService _audit;
-    private readonly IEmailService _email;
+    private readonly IMediator _mediator;
     private readonly EmailRenderer _renderer;
     private readonly EmailOptions _emailOptions;
 
     public AdminController(
-        IUnitOfWork uow,
-        IAuditService audit,
-        IEmailService email,
+        IMediator mediator,
         EmailRenderer renderer,
         IOptions<EmailOptions> emailOptions)
     {
-        _uow = uow;
-        _audit = audit;
-        _email = email;
+        _mediator = mediator;
         _renderer = renderer;
         _emailOptions = emailOptions.Value;
     }
@@ -37,29 +34,8 @@ public class AdminController : ControllerBase
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard(CancellationToken ct)
     {
-        var totalUsers = await _uow.Users.CountAsync(null, ct);
-        var activeUsers = await _uow.Users.CountAsync(u => u.IsActive, ct);
-        var inactiveUsers = await _uow.Users.CountAsync(u => !u.IsActive, ct);
-        var newUsersLast7Days = await _uow.Users.CountAsync(
-            u => u.CreatedAt >= DateTime.UtcNow.AddDays(-7), ct);
-
-        var expiredPasswords = await _uow.Users.CountAsync(
-            u => u.IsActive && u.LastPasswordChangeAt == null, ct);
-        var expiringSoonPasswords = await _uow.Users.CountAsync(
-            u => u.IsActive
-                && u.LastPasswordChangeAt != null
-                && u.LastPasswordChangeAt.Value.AddDays(u.PasswordExpirationDays) <= DateTime.UtcNow.AddDays(7)
-                && u.LastPasswordChangeAt.Value.AddDays(u.PasswordExpirationDays) > DateTime.UtcNow, ct);
-
-        return Ok(ApiResponse<object>.Ok(new
-        {
-            totalUsers,
-            activeUsers,
-            inactiveUsers,
-            newUsersLast7Days,
-            expiredPasswords,
-            expiringSoonPasswords
-        }));
+        var result = await _mediator.Send(new GetDashboardQuery(), ct);
+        return Ok(ApiResponse<GetDashboardResponse>.Ok(result));
     }
 
     [HttpGet("audit-log")]
@@ -68,23 +44,8 @@ public class AdminController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
     {
-        var result = await _uow.AuditLogs.GetPagedAsync(page, pageSize, ct: ct);
-        return Ok(ApiResponse<object>.Ok(new
-        {
-            items = result.Items.Select(l => new
-            {
-                l.Action,
-                l.EntityType,
-                l.EntityId,
-                l.Details,
-                l.UserId,
-                l.CreatedAt
-            }),
-            result.TotalCount,
-            result.Page,
-            result.PageSize,
-            result.TotalPages
-        }));
+        var result = await _mediator.Send(new GetAuditLogQuery(page, pageSize), ct);
+        return Ok(ApiResponse<GetAuditLogResponse>.Ok(result));
     }
 
     [HttpPost("revoke-all-tokens")]
@@ -95,14 +56,10 @@ public class AdminController : ControllerBase
         if (!string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var uid))
             userId = uid;
 
-        await _uow.RefreshTokens.RevokeAllGlobalAsync(userId, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        await _audit.LogAsync(
-            "AllTokensRevoked", "System", null,
-            null, null, userId,
+        var outcome = await _mediator.Send(new RevokeAllTokensCommand(
+            userId,
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(), null, ct);
+            Request.Headers.UserAgent.ToString()), ct);
 
         return Ok(ApiResponse<object>.Ok("All sessions revoked"));
     }
@@ -126,28 +83,25 @@ public class AdminController : ControllerBase
             ["Year"] = DateTime.UtcNow.Year.ToString()
         };
 
-        try
+        var htmlBody = _renderer.Render(config.TemplateFile, vars);
+
+        var userIdClaim = User.FindFirst("sub")?.Value;
+        Guid? userId = null;
+        if (!string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var uid))
+            userId = uid;
+
+        var outcome = await _mediator.Send(new SendTestEmailCommand(
+            request.To, config.Subject, htmlBody, userId,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString()), ct);
+
+        if (!outcome.Result.IsSuccess)
         {
-            var htmlBody = _renderer.Render(config.TemplateFile, vars);
-            await _email.SendEmailAsync(request.To, config.Subject, htmlBody, ct);
-
-            var userIdClaim = User.FindFirst("sub")?.Value;
-            Guid? userId = null;
-            if (!string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var uid))
-                userId = uid;
-
-            await _audit.LogAsync(
-                "TestEmailSent", "Email", null,
-                $"Test email sent to {request.To}", null, userId,
-                HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                Request.Headers.UserAgent.ToString(), null, ct);
-
-            return Ok(ApiResponse<object>.Ok($"Test email sent to {request.To}"));
+            return StatusCode(500, ApiResponse<object>.Fail(
+                $"Failed to send test email: {outcome.Result.ErrorMessage}"));
         }
-        catch (Exception ex)
-        {
-            return StatusCode(500, ApiResponse<object>.Fail($"Failed to send test email: {ex.Message}"));
-        }
+
+        return Ok(ApiResponse<object>.Ok($"Test email sent to {request.To}"));
     }
 }
 
