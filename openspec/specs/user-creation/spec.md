@@ -133,25 +133,19 @@ The system SHALL provide a `POST /api/users/{id}/resend-onboarding-email` endpoi
 - **WHEN** a resend succeeds
 - **THEN** the `OnboardingEmailResentAuditLogHandler` MUST write an `OnboardingEmailResent` audit log entry including `userId`, `ipAddress` from the request, and `userAgent` from the request
 
-### Requirement: User identity is permanent (no public delete)
+### Requirement: User identity is preserved via soft-delete
 
-The public HTTP surface MUST NOT offer any operation that removes a
-user from the system. A user is created once, may be activated and
-deactivated, may have its name and roles updated, and may receive
-resend-onboarding emails. The only status-change endpoint is
-`PATCH /api/users/{id}/activate`, which toggles `IsActive`; the row
-itself remains in `Users` indefinitely.
+The system SHALL use soft-delete for user removal: `DELETE /api/users/{id}` calls `user.SoftDelete()` which sets `DeletedAt` but keeps the row in the database. The global query filter (`WHERE "DeletedAt" IS NULL`) hides soft-deleted users from normal lookups (`GetByEmailAsync`, listing queries). Hard deletes MUST NOT be exposed via the API.
 
-The system MUST NOT expose a `DELETE /api/users/{id}` route. The
-frontend MUST NOT offer a delete affordance for a user. The
-repository's `DeleteAsync` and the entity's `SoftDelete` methods are
-internal-only and are not reachable from any controller action.
+The `DeleteUserCommandHandler` SHALL prevent self-deletion (`CannotDeleteSelf` outcome) and return `UserNotFound` for non-existent users.
 
-#### Scenario: API does not expose a user delete route
-- **WHEN** the public OpenAPI/Scalar documentation is consulted
-- **THEN** there is no `DELETE /api/users/{id}` (or equivalent) entry
-- **AND** the `UsersController` does not declare any `[HttpDelete]`
-  action that targets a user
+#### Scenario: Delete soft-deletes the user
+- **WHEN** an admin calls `DELETE /api/users/{id}` for an existing user (not the current user)
+- **THEN** the system MUST call `user.SoftDelete()`, persist via `IUnitOfWork.SaveChangesAsync`, and return HTTP 200
+
+#### Scenario: Self-deletion is rejected
+- **WHEN** an admin calls `DELETE /api/users/{id}` where the target is the current user
+- **THEN** the system MUST return HTTP 400 with `ApiResponse<object>.Fail` indicating self-deletion is not allowed
 
 #### Scenario: Frontend does not show a delete button
 - **WHEN** an administrator opens the `/users` page
