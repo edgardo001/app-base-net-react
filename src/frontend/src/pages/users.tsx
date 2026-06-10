@@ -87,7 +87,7 @@ export function UsersPage() {
   const fetchRoles = async () => {
     try {
       const { data } = await api.get('/roles')
-      setRoles(data.data || [])
+      setRoles(data.data?.items || data.data || [])
     } catch { /* roles are secondary — ignore */ }
   }
 

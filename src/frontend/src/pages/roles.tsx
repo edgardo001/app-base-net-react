@@ -46,7 +46,7 @@ export function RolesPage() {
     setLoading(true)
     try {
       const { data } = await api.get('/roles')
-      setRoles(data.data || [])
+      setRoles(data.data?.items || data.data || [])
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Error al cargar roles'))
     }
@@ -123,7 +123,7 @@ export function RolesPage() {
     setShowUsersModal(true)
     try {
       const { data } = await api.get(`/roles/${role.id}/users`)
-      setRoleUsers(data.data || [])
+      setRoleUsers(data.data?.users || data.data || [])
     } catch {
       setRoleUsers([])
     }
