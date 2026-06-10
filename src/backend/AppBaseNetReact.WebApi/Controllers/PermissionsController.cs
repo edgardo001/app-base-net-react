@@ -1,7 +1,8 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AppBaseNetReact.Application.Common.Interfaces;
-using AppBaseNetReact.Application.Common.Validators;
+using AppBaseNetReact.Application.Features.Permissions.Queries.GetPermissions;
+using AppBaseNetReact.Application.Features.Permissions.Queries.GetModules;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -11,34 +12,24 @@ namespace AppBaseNetReact.WebApi.Controllers;
 [Authorize]
 public class PermissionsController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
+    private readonly IMediator _mediator;
 
-    public PermissionsController(IUnitOfWork uow)
+    public PermissionsController(IMediator mediator)
     {
-        _uow = uow;
+        _mediator = mediator;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetPermissions(CancellationToken ct)
     {
-        var permissions = await _uow.Permissions.GetAllAsync(ct);
-        return Ok(ApiResponse<object>.Ok(permissions.Select(p => new
-        {
-            p.Id, p.Code, p.Name, p.Module, p.Description
-        })));
+        var result = await _mediator.Send(new GetPermissionsQuery(), ct);
+        return Ok(ApiResponse<GetPermissionsResponse>.Ok(result));
     }
 
     [HttpGet("modules")]
     public async Task<IActionResult> GetModules(CancellationToken ct)
     {
-        var permissions = await _uow.Permissions.GetAllAsync(ct);
-        var modules = permissions
-            .GroupBy(p => p.Module)
-            .Select(g => new
-            {
-                Module = g.Key,
-                Permissions = g.Select(p => new { p.Id, p.Code, p.Name, p.Description })
-            });
-        return Ok(ApiResponse<object>.Ok(modules));
+        var result = await _mediator.Send(new GetModulesQuery(), ct);
+        return Ok(ApiResponse<GetModulesResponse>.Ok(result));
     }
 }
