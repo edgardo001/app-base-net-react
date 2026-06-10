@@ -23,3 +23,4 @@ public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
 
 public record CreateUserRequest(string Email, string FirstName, string LastName, List<Guid>? RoleIds);
 public record UpdateUserRequest(string FirstName, string LastName, List<Guid>? RoleIds);
+public record ToggleActiveRequest(bool Active);

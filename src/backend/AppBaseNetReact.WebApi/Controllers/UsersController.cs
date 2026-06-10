@@ -1,22 +1,18 @@
-// Controllers sin referencia a EF Core. Las operaciones de base de
-// datos se hacen exclusivamente via IUnitOfWork (interfaces en
-// Application layer). User.Create(...) se invoca con nombre fully
-// qualified porque en .NET 10 con implicit usings, "User" puede
-// resolver a System.IO.FileSystemAclExtensions en ciertos contextos,
-// causando CS7036 (no es un bug del compilador sino una ambiguedad
-// introducida por extension methods de System.IO en el SDK).
-using System.Security.Cryptography;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Models;
 using AppBaseNetReact.Application.Common.Validators;
-using AppBaseNetReact.Application.Features.Users.Commands.ResendOnboardingEmail;
-using AppBaseNetReact.Domain.Entities;
-using AppBaseNetReact.Infrastructure.Email;
-using AppBaseNetReact.Infrastructure.Services;
+using AppBaseNetReact.Application.Features.Users.Commands.AdminResetPassword;
+using AppBaseNetReact.Application.Features.Users.Commands.CreateUser;
+using AppBaseNetReact.Application.Features.Users.Commands.DeleteUser;
+using AppBaseNetReact.Application.Features.Users.Commands.RevokeTokens;
+using AppBaseNetReact.Application.Features.Users.Commands.ToggleActive;
+using AppBaseNetReact.Application.Features.Users.Commands.UpdateUser;
+using AppBaseNetReact.Application.Features.Users.Commands.UploadAvatar;
+using AppBaseNetReact.Application.Features.Users.Queries.GetAvatar;
+using AppBaseNetReact.Application.Features.Users.Queries.GetUser;
+using AppBaseNetReact.Application.Features.Users.Queries.GetUsers;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -26,39 +22,13 @@ namespace AppBaseNetReact.WebApi.Controllers;
 [Authorize]
 public class UsersController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IPasswordHasherService _hasher;
-    private readonly IEmailService _email;
-    private readonly EmailRenderer _renderer;
-    private readonly EmailOptions _emailOptions;
-    private readonly IRandomPasswordGenerator _passwords;
     private readonly IMediator _mediator;
-    private readonly IAuditService _audit;
-    private readonly IFileStorageService _storage;
-    private readonly StorageOptions _storageOptions;
+    private readonly string _frontendUrl;
 
-    public UsersController(
-        IUnitOfWork uow,
-        IPasswordHasherService hasher,
-        IEmailService email,
-        EmailRenderer renderer,
-        IOptions<EmailOptions> emailOptions,
-        IRandomPasswordGenerator passwords,
-        IMediator mediator,
-        IAuditService audit,
-        IFileStorageService storage,
-        IOptions<StorageOptions> storageOptions)
+    public UsersController(IMediator mediator, IConfiguration configuration)
     {
-        _uow = uow;
-        _hasher = hasher;
-        _email = email;
-        _renderer = renderer;
-        _emailOptions = emailOptions.Value;
-        _passwords = passwords;
         _mediator = mediator;
-        _audit = audit;
-        _storage = storage;
-        _storageOptions = storageOptions.Value;
+        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
     }
 
     [HttpGet]
@@ -70,98 +40,57 @@ public class UsersController : ControllerBase
         [FromQuery] bool sortDesc = false,
         CancellationToken ct = default)
     {
-        var result = await _uow.Users.GetPagedAsync(page, pageSize, null, sortBy, sortDesc, search, ct);
+        var response = await _mediator.Send(
+            new GetUsersQuery(page, pageSize, search, sortBy, sortDesc), ct);
+
         return Ok(new PagedResponse<UserDto>
         {
-            Items = result.Items.Select(u => new UserDto
-            {
-                Id = u.Id,
-                Email = u.Email,
-                FirstName = u.FirstName,
-                LastName = u.LastName,
-                IsActive = u.IsActive,
-                EmailConfirmed = u.EmailConfirmed,
-                LastLoginAt = u.LastLoginAt,
-                CreatedAt = u.CreatedAt
-            }).ToList(),
-            TotalCount = result.TotalCount,
-            Page = result.Page,
-            PageSize = result.PageSize,
-            TotalPages = result.TotalPages,
-            HasPreviousPage = result.HasPreviousPage,
-            HasNextPage = result.HasNextPage
+            Items = response.Items,
+            TotalCount = response.TotalCount,
+            Page = response.Page,
+            PageSize = response.PageSize,
+            TotalPages = response.TotalPages,
+            HasPreviousPage = response.HasPreviousPage,
+            HasNextPage = response.HasNextPage
         });
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetUser(Guid id, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdWithRolesAsync(id, ct);
-        if (user == null) return NotFound();
+        var response = await _mediator.Send(new GetUserQuery(id), ct);
+        if (response == null) return NotFound();
 
-        return Ok(ApiResponse<UserDetailDto>.Ok(new UserDetailDto
-        {
-            Id = user.Id,
-            Email = user.Email,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            AvatarPath = user.AvatarPath,
-            IsActive = user.IsActive,
-            EmailConfirmed = user.EmailConfirmed,
-            LastLoginAt = user.LastLoginAt,
-            LastPasswordChangeAt = user.LastPasswordChangeAt,
-            CreatedAt = user.CreatedAt,
-            Roles = user.UserRoles.Select(ur => new RoleDto
-            {
-                Id = ur.RoleId,
-                Name = ur.Role.Name
-            }).ToList()
-        }));
+        return Ok(ApiResponse<GetUserResponse>.Ok(response));
     }
 
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request, CancellationToken ct)
     {
-        var existing = await _uow.Users.GetByEmailAsync(request.Email, ct);
-        if (existing != null)
-            return Conflict(ApiResponse<object>.Fail("Email already registered"));
-
-        var temporaryPassword = _passwords.Generate();
-        var user = AppBaseNetReact.Domain.Entities.User.Create(
+        var outcome = await _mediator.Send(new CreateUserCommand(
             request.Email,
             request.FirstName,
             request.LastName,
-            _hasher.HashPassword(temporaryPassword));
-        user.ForcePasswordChange();
+            request.RoleIds,
+            _frontendUrl,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
 
-        var confirmationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        user.SetEmailConfirmationToken(confirmationToken, DateTime.UtcNow.AddHours(24));
+        if (outcome.Result.IsSuccess)
+            return CreatedAtAction(nameof(GetUser), new { id = outcome.Result.UserId },
+                ApiResponse<object>.Ok(new { outcome.Result.UserId, outcome.Result.Email }));
 
-        if (request.RoleIds?.Any() == true)
+        return outcome.Result.ErrorCode switch
         {
-            foreach (var roleId in request.RoleIds)
-                user.UserRoles.Add(UserRole.Create(user.Id, roleId));
-        }
-
-        await _uow.Users.AddAsync(user, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        var confirmationLink = $"{_emailOptions.FrontendBaseUrl.TrimEnd('/')}/confirm-email?token={confirmationToken}";
-        await SendEmail(user, "EmailConfirmation", new Dictionary<string, string>
-        {
-            ["UserName"] = user.FirstName,
-            ["ConfirmationLink"] = confirmationLink,
-            ["TemporaryPassword"] = temporaryPassword
-        }, ct);
-
-        return CreatedAtAction(nameof(GetUser), new { id = user.Id },
-            ApiResponse<object>.Ok(new { user.Id, user.Email }));
+            "DuplicateEmail" => Conflict(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpPost("{id:guid}/resend-onboarding-email")]
     public async Task<IActionResult> ResendOnboardingEmail(Guid id, CancellationToken ct)
     {
-        var command = new ResendOnboardingEmailCommand(
+        var command = new AppBaseNetReact.Application.Features.Users.Commands.ResendOnboardingEmail.ResendOnboardingEmailCommand(
             id,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             Request.Headers.UserAgent.ToString());
@@ -180,171 +109,145 @@ public class UsersController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdWithRolesAsync(id, ct);
-        if (user == null) return NotFound();
+        var outcome = await _mediator.Send(new UpdateUserCommand(
+            id,
+            request.FirstName,
+            request.LastName,
+            request.RoleIds,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
 
-        user.UpdateProfile(request.FirstName, request.LastName);
+        if (outcome.Result.IsSuccess)
+            return Ok(ApiResponse<object>.Ok("User updated"));
 
-        if (request.RoleIds != null)
+        return outcome.Result.ErrorCode switch
         {
-            user.UserRoles.Clear();
-            foreach (var roleId in request.RoleIds)
-                user.UserRoles.Add(UserRole.Create(user.Id, roleId));
-        }
-
-        await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok("User updated"));
+            "UserNotFound" => NotFound(),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpPatch("{id:guid}/activate")]
     public async Task<IActionResult> ToggleActive(Guid id, [FromBody] ToggleActiveRequest request, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return NotFound();
+        var outcome = await _mediator.Send(new ToggleActiveCommand(
+            id,
+            request.Active,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
 
-        user.SetActive(request.Active);
-        await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok(request.Active ? "User activated" : "User deactivated"));
+        if (outcome.Result.IsSuccess)
+            return Ok(ApiResponse<object>.Ok(request.Active ? "User activated" : "User deactivated"));
+
+        return outcome.Result.ErrorCode switch
+        {
+            "UserNotFound" => NotFound(),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpPatch("{id:guid}/reset-password")]
     public async Task<IActionResult> ResetPassword(Guid id, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return NotFound();
+        var loginLink = $"{Request.Scheme}://{Request.Host}/login";
 
-        var tempPassword = Guid.NewGuid().ToString("N")[..12];
-        user.SetPasswordHash(_hasher.HashPassword(tempPassword));
-        user.ConfirmEmail();
-        await _uow.SaveChangesAsync(ct);
+        var outcome = await _mediator.Send(new AdminResetPasswordCommand(
+            id,
+            loginLink,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
 
-        await SendEmail(user, "TemporaryPassword", new Dictionary<string, string>
+        if (outcome.Result.IsSuccess)
+            return Ok(ApiResponse<object>.Ok("Temporary password sent via email"));
+
+        return outcome.Result.ErrorCode switch
         {
-            ["UserName"] = user.FirstName,
-            ["TempPassword"] = tempPassword,
-            ["LoginLink"] = $"{Request.Scheme}://{Request.Host}/login"
-        }, ct);
-
-        return Ok(ApiResponse<object>.Ok("Temporary password sent via email"));
+            "UserNotFound" => NotFound(),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpPatch("{id:guid}/revoke-tokens")]
     public async Task<IActionResult> RevokeTokens(Guid id, CancellationToken ct)
     {
-        await _uow.RefreshTokens.RevokeAllForUserAsync(id, null, ct);
-        await _uow.SaveChangesAsync(ct);
-        return Ok(ApiResponse<object>.Ok("All sessions revoked for user"));
+        var outcome = await _mediator.Send(new RevokeTokensCommand(
+            id,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
+
+        if (outcome.Result.IsSuccess)
+            return Ok(ApiResponse<object>.Ok("All sessions revoked for user"));
+
+        return outcome.Result.ErrorCode switch
+        {
+            "UserNotFound" => NotFound(),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteUser(Guid id, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return NotFound();
+        var sub = User.FindFirst("sub")?.Value;
+        Guid? currentUserId = Guid.TryParse(sub, out var parsed) ? parsed : null;
 
-        var currentUserId = GetCurrentUserId();
-        if (currentUserId == id)
-            return BadRequest(ApiResponse<object>.Fail("Cannot delete yourself"));
+        var outcome = await _mediator.Send(new DeleteUserCommand(
+            id,
+            currentUserId,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
 
-        user.SoftDelete(currentUserId);
-        await _uow.SaveChangesAsync(ct);
+        if (outcome.Result.IsSuccess)
+            return Ok(ApiResponse<object>.Ok("User deleted"));
 
-        await _audit.LogAsync(
-            "UserDeleted", "User", id.ToString(),
-            null, null, currentUserId,
-            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(),
-            $"User '{user.Email}' soft-deleted", ct);
-
-        return Ok(ApiResponse<object>.Ok("User deleted"));
+        return outcome.Result.ErrorCode switch
+        {
+            "UserNotFound" => NotFound(),
+            "CannotDeleteSelf" => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpPost("{id:guid}/avatar")]
     [RequestSizeLimit(5242880)]
     public async Task<IActionResult> UploadAvatar(Guid id, IFormFile file, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return NotFound();
+        using var stream = file.OpenReadStream();
+        var outcome = await _mediator.Send(new UploadAvatarCommand(
+            id,
+            stream,
+            file.FileName,
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            Request.Headers.UserAgent.ToString()), ct);
 
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!_storageOptions.AllowedExtensions.Contains(ext))
-            return BadRequest(ApiResponse<object>.Fail($"File type not allowed. Allowed: {string.Join(", ", _storageOptions.AllowedExtensions)}"));
+        if (outcome.Result.IsSuccess)
+            return Ok(ApiResponse<object>.Ok(new { fileName = outcome.Result.FilePath }));
 
-        if (file.Length > _storageOptions.MaxFileSize)
-            return BadRequest(ApiResponse<object>.Fail($"File size exceeds maximum of {_storageOptions.MaxFileSize} bytes"));
-
-        var fileName = await _storage.SaveFileAsync(file.OpenReadStream(), ext, ct);
-        user.SetAvatar(fileName);
-        await _uow.SaveChangesAsync(ct);
-
-        return Ok(ApiResponse<object>.Ok(new { fileName }));
+        return outcome.Result.ErrorCode switch
+        {
+            "UserNotFound" => NotFound(),
+            "InvalidExtension" => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            "FileTooLarge" => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
+        };
     }
 
     [HttpGet("{id:guid}/avatar")]
     public async Task<IActionResult> GetAvatar(Guid id, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
-        if (user == null) return NotFound();
-        if (string.IsNullOrEmpty(user.AvatarPath)) return NotFound(ApiResponse<object>.Fail("No avatar set"));
+        var outcome = await _mediator.Send(new GetAvatarQuery(id), ct);
 
-        var filePath = await _storage.GetFilePathAsync(user.AvatarPath);
-        if (filePath == null) return NotFound(ApiResponse<object>.Fail("Avatar file not found"));
+        if (outcome.Result.IsSuccess)
+            return PhysicalFile(outcome.Result.FilePath!, outcome.Result.ContentType!);
 
-        var contentType = Path.GetExtension(filePath).ToLowerInvariant() switch
+        return outcome.Result.ErrorCode switch
         {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => "application/octet-stream"
+            "UserNotFound" => NotFound(),
+            "NoAvatar" => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            "FileNotFound" => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
+            _ => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
         };
-
-        return PhysicalFile(filePath, contentType);
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var sub = User.FindFirst("sub")?.Value;
-        if (Guid.TryParse(sub, out var id)) return id;
-        return null;
-    }
-
-    private async Task SendEmail(Domain.Entities.User user, string templateName, Dictionary<string, string> extraVars, CancellationToken ct)
-    {
-        if (!_emailOptions.Templates.TryGetValue(templateName, out var config)) return;
-
-        var vars = new Dictionary<string, string>(extraVars)
-        {
-            ["Year"] = DateTime.UtcNow.Year.ToString()
-        };
-
-        var htmlBody = _renderer.Render(config.TemplateFile, vars);
-        await _email.SendEmailAsync(user.Email, config.Subject, htmlBody, ct);
     }
 }
 
-public class UserDto
-{
-    public Guid Id { get; set; }
-    public string Email { get; set; } = string.Empty;
-    public string FirstName { get; set; } = string.Empty;
-    public string LastName { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-    public bool EmailConfirmed { get; set; }
-    public DateTime? LastLoginAt { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
-public class UserDetailDto : UserDto
-{
-    public string? AvatarPath { get; set; }
-    public DateTime? LastPasswordChangeAt { get; set; }
-    public List<RoleDto> Roles { get; set; } = [];
-}
-
-public class RoleDto
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-}
-
-public record ToggleActiveRequest(bool Active);
+// Request types defined in AppBaseNetReact.Application.Common.Validators

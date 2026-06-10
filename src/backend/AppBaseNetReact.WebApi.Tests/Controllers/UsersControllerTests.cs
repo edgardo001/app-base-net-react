@@ -2,15 +2,21 @@ using FluentAssertions;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Moq;
-using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Models;
 using AppBaseNetReact.Application.Common.Validators;
+using AppBaseNetReact.Application.Features.Users.Commands.AdminResetPassword;
+using AppBaseNetReact.Application.Features.Users.Commands.CreateUser;
+using AppBaseNetReact.Application.Features.Users.Commands.DeleteUser;
+using AppBaseNetReact.Application.Features.Users.Commands.RevokeTokens;
+using AppBaseNetReact.Application.Features.Users.Commands.ToggleActive;
+using AppBaseNetReact.Application.Features.Users.Commands.UpdateUser;
+using AppBaseNetReact.Application.Features.Users.Commands.UploadAvatar;
 using AppBaseNetReact.Application.Features.Users.Commands.ResendOnboardingEmail;
-using AppBaseNetReact.Domain.Entities;
-using AppBaseNetReact.Infrastructure.Email;
-using AppBaseNetReact.Infrastructure.Services;
+using AppBaseNetReact.Application.Features.Users.Queries.GetAvatar;
+using AppBaseNetReact.Application.Features.Users.Queries.GetUser;
+using AppBaseNetReact.Application.Features.Users.Queries.GetUsers;
 using AppBaseNetReact.WebApi.Controllers;
 using AppBaseNetReact.WebApi.Filters;
 
@@ -18,47 +24,16 @@ namespace AppBaseNetReact.WebApi.Tests.Controllers;
 
 public class UsersControllerTests
 {
-    private readonly Mock<IUnitOfWork> _uow = new();
-    private readonly Mock<IPasswordHasherService> _hasher = new();
-    private readonly Mock<IEmailService> _email = new();
-    private readonly Mock<IRandomPasswordGenerator> _passwords = new();
     private readonly Mock<IMediator> _mediator = new();
-    private readonly Mock<IAuditService> _audit = new();
-    private readonly Mock<IFileStorageService> _storage = new();
-    private readonly EmailRenderer _renderer = new();
-    private readonly EmailOptions _emailOptions = new()
-    {
-        Templates = new Dictionary<string, EmailTemplateConfig>
-        {
-            ["Welcome"] = new() { Subject = "Bienvenido", TemplateFile = "welcome.html" },
-            ["EmailConfirmation"] = new() { Subject = "Confirma tu correo", TemplateFile = "email-confirmation.html" },
-            ["EmailResend"] = new() { Subject = "Confirma tu correo", TemplateFile = "email-resend.html" },
-            ["TemporaryPassword"] = new() { Subject = "Contraseña temporal", TemplateFile = "temporary-password.html" }
-        }
-    };
-    private readonly StorageOptions _storageOptions = new()
-    {
-        BasePath = "storage/avatars",
-        MaxFileSize = 5242880,
-        AllowedExtensions = [".jpg", ".jpeg", ".png", ".webp"]
-    };
     private readonly UsersController _controller;
 
     public UsersControllerTests()
     {
-        _hasher.Setup(x => x.HashPassword(It.IsAny<string>())).Returns("hashed");
-        _passwords.Setup(x => x.Generate()).Returns("TmpPass123Abc");
-        _uow.Setup(x => x.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User u, CancellationToken _) => u);
-        _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["FrontendUrl"] = "http://localhost:5173" })
+            .Build();
 
-        _mediator.Setup(x => x.Send(It.IsAny<ResendOnboardingEmailCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ResendOnboardingEmailCommand _, CancellationToken _) =>
-                new ResendOnboardingEmailOutcome(ResendOnboardingEmailResult.Success()));
-
-        _controller = new UsersController(
-            _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(_emailOptions),
-            _passwords.Object, _mediator.Object, _audit.Object, _storage.Object, Options.Create(_storageOptions));
+        _controller = new UsersController(_mediator.Object, configuration);
 
         _controller.ControllerContext = new ControllerContext
         {
@@ -69,163 +44,102 @@ public class UsersControllerTests
         };
     }
 
+    // ── GetUsers ──
+
     [Fact]
-    public async Task CreateUser_WithValidRequest_PersistsAndSendsConfirmationEmail()
+    public async Task GetUsers_ReturnsOkWithPagedResponse()
     {
-        User? capturedUser = null;
-        _uow.Setup(x => x.Users.GetByEmailAsync("new@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        _uow.Setup(x => x.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
-            .Callback<User, CancellationToken>((u, _) => capturedUser = u)
-            .ReturnsAsync((User u, CancellationToken _) => u);
+        _mediator.Setup(x => x.Send(It.IsAny<GetUsersQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GetUsersResponse
+            {
+                Items = [new() { Id = Guid.NewGuid(), Email = "a@test.com", FirstName = "A", LastName = "B" }],
+                TotalCount = 1,
+                Page = 1,
+                PageSize = 10,
+                TotalPages = 1
+            });
+
+        var result = await _controller.GetUsers(page: 1, pageSize: 10, ct: CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<PagedResponse<UserDto>>().Subject;
+        response.Items.Should().HaveCount(1);
+        response.TotalCount.Should().Be(1);
+    }
+
+    // ── GetUser ──
+
+    [Fact]
+    public async Task GetUser_WhenExists_ReturnsOkWithUserDetail()
+    {
+        var userId = Guid.NewGuid();
+        _mediator.Setup(x => x.Send(It.Is<GetUserQuery>(q => q.UserId == userId), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GetUserResponse
+            {
+                Id = userId,
+                Email = "a@test.com",
+                FirstName = "A",
+                LastName = "B"
+            });
+
+        var result = await _controller.GetUser(userId, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<GetUserResponse>>().Subject;
+        response.Success.Should().BeTrue();
+        response.Data!.Email.Should().Be("a@test.com");
+    }
+
+    [Fact]
+    public async Task GetUser_WhenNotExists_ReturnsNotFound()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<GetUserQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GetUserResponse?)null);
+
+        var result = await _controller.GetUser(Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    // ── CreateUser ──
+
+    [Fact]
+    public async Task CreateUser_WithValidRequest_ReturnsCreatedAtAction()
+    {
+        var userId = Guid.NewGuid();
+        _mediator.Setup(x => x.Send(It.IsAny<CreateUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreateUserOutcome(CreateUserResult.Success(userId, "new@test.com")));
 
         var result = await _controller.CreateUser(
-            new CreateUserRequest("new@test.com", "Test", "User", null),
-            CancellationToken.None);
+            new CreateUserRequest("new@test.com", "Test", "User", null), CancellationToken.None);
 
         result.Should().BeOfType<CreatedAtActionResult>();
-        _uow.Verify(x => x.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-
-        capturedUser.Should().NotBeNull();
-        capturedUser!.EmailConfirmationToken.Should().NotBeNullOrEmpty();
-        capturedUser.EmailConfirmed.Should().BeFalse();
-        capturedUser.EmailConfirmationTokenExpires.Should().NotBeNull();
-        capturedUser.EmailConfirmationTokenExpires!.Value
-            .Should().BeCloseTo(DateTime.UtcNow.AddHours(24), TimeSpan.FromMinutes(1));
-        capturedUser.LastPasswordChangeAt.Should().BeNull();
-
-        _hasher.Verify(x => x.HashPassword("TmpPass123Abc"), Times.Once);
-        _email.Verify(x => x.SendEmailAsync(
-            "new@test.com", "Confirma tu correo", It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateUser_SendsEmailWithConfirmationLink()
-    {
-        string? capturedBody = null;
-        _uow.Setup(x => x.Users.GetByEmailAsync("new@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        _email.Setup(x => x.SendEmailAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, CancellationToken>((_, _, body, _) => capturedBody = body)
-            .Returns(Task.CompletedTask);
-
-        await _controller.CreateUser(
-            new CreateUserRequest("new@test.com", "Test", "User", null),
-            CancellationToken.None);
-
-        capturedBody.Should().NotBeNullOrEmpty();
-        capturedBody.Should().Contain("http://localhost:5173/confirm-email?token=");
-    }
-
-    [Fact]
-    public async Task CreateUser_EmailBody_ContainsTemporaryPassword()
-    {
-        string? capturedBody = null;
-        _uow.Setup(x => x.Users.GetByEmailAsync("new@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        _email.Setup(x => x.SendEmailAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, CancellationToken>((_, _, body, _) => capturedBody = body)
-            .Returns(Task.CompletedTask);
-
-        await _controller.CreateUser(
-            new CreateUserRequest("new@test.com", "Test", "User", null),
-            CancellationToken.None);
-
-        capturedBody.Should().NotBeNullOrEmpty();
-        capturedBody.Should().Contain("TmpPass123Abc");
-    }
-
-    [Fact]
-    public async Task CreateUser_UsesConfiguredFrontendBaseUrl()
-    {
-        var customOptions = new EmailOptions
-        {
-            FrontendBaseUrl = "https://app.example.com",
-            Templates = _emailOptions.Templates
-        };
-        var customController = new UsersController(
-            _uow.Object, _hasher.Object, _email.Object, _renderer, Options.Create(customOptions),
-            _passwords.Object, _mediator.Object, _audit.Object, _storage.Object, Options.Create(_storageOptions));
-        customController.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                Request = { Scheme = "https", Host = new HostString("api.example.com") }
-            }
-        };
-
-        string? capturedBody = null;
-        _uow.Setup(x => x.Users.GetByEmailAsync("new@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        _email.Setup(x => x.SendEmailAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, CancellationToken>((_, _, body, _) => capturedBody = body)
-            .Returns(Task.CompletedTask);
-
-        await customController.CreateUser(
-            new CreateUserRequest("new@test.com", "Test", "User", null),
-            CancellationToken.None);
-
-        capturedBody.Should().NotBeNullOrEmpty();
-        capturedBody.Should().Contain("https://app.example.com/confirm-email?token=");
-        capturedBody.Should().NotContain("api.example.com");
-        capturedBody.Should().NotContain("localhost:5011");
+        _mediator.Verify(x => x.Send(
+            It.Is<CreateUserCommand>(c => c.Email == "new@test.com"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task CreateUser_WithDuplicateEmail_Returns409()
     {
-        var existing = User.Create("taken@test.com", "Other", "User", "hash");
-        _uow.Setup(x => x.Users.GetByEmailAsync("taken@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existing);
+        _mediator.Setup(x => x.Send(It.IsAny<CreateUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreateUserOutcome(CreateUserResult.DuplicateEmail()));
 
         var result = await _controller.CreateUser(
-            new CreateUserRequest("taken@test.com", "Test", "User", null),
-            CancellationToken.None);
+            new CreateUserRequest("taken@test.com", "Test", "User", null), CancellationToken.None);
 
         result.Should().BeOfType<ConflictObjectResult>();
-        _uow.Verify(x => x.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
-        _hasher.Verify(x => x.HashPassword(It.IsAny<string>()), Times.Never);
     }
 
-    [Fact]
-    public async Task CreateUser_WhenOnlySoftDeletedUserHasEmail_ProceedsWithInsert()
-    {
-        // Documents the controller-layer contract: the pre-check is
-        // "GetByEmailAsync returns non-null", and the repository's
-        // query filter hides soft-deleted users. Therefore, when a
-        // soft-deleted user already occupies the email, the controller
-        // proceeds to AddAsync. Against PostgreSQL with a non-partial
-        // unique index, the underlying SaveChangesAsync throws
-        // DbUpdateException(IX_Users_Email). Against a partial unique
-        // index (WHERE "DeletedAt" IS NULL), the insert succeeds.
-        // This is the regression guard for the production bug.
-        _uow.Setup(x => x.Users.GetByEmailAsync("reused@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-
-        var result = await _controller.CreateUser(
-            new CreateUserRequest("reused@test.com", "New", "User", null),
-            CancellationToken.None);
-
-        // Not a 409: the controller is unaware of the soft-deleted user.
-        result.Should().NotBeOfType<ConflictObjectResult>(
-            "GetByEmailAsync returns null for soft-deleted users (global query filter), so the " +
-            "controller's 409 branch is unreachable when the email is held by a soft-deleted user");
-        _uow.Verify(x => x.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
-        // PostgreSQL pre-migration: this SaveChangesAsync would throw
-        //   Npgsql.PostgresException 23505 IX_Users_Email
-        // PostgreSQL post-migration (partial unique index): succeeds.
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
+    // ── ResendOnboardingEmail ──
 
     [Fact]
     public async Task ResendOnboardingEmail_WhenHandlerSucceeds_Returns200()
     {
         var userId = Guid.NewGuid();
+        _mediator.Setup(x => x.Send(It.IsAny<ResendOnboardingEmailCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResendOnboardingEmailOutcome(ResendOnboardingEmailResult.Success()));
+
         var result = await _controller.ResendOnboardingEmail(userId, CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
@@ -237,12 +151,11 @@ public class UsersControllerTests
     [Fact]
     public async Task ResendOnboardingEmail_WhenUserNotFound_Returns404()
     {
-        var userId = Guid.NewGuid();
         _mediator.Setup(x => x.Send(It.IsAny<ResendOnboardingEmailCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ResendOnboardingEmailOutcome(
                 ResendOnboardingEmailResult.Fail(ResendOnboardingErrorCode.UserNotFound, "User not found")));
 
-        var result = await _controller.ResendOnboardingEmail(userId, CancellationToken.None);
+        var result = await _controller.ResendOnboardingEmail(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<NotFoundObjectResult>();
     }
@@ -250,87 +163,34 @@ public class UsersControllerTests
     [Fact]
     public async Task ResendOnboardingEmail_WhenAlreadyConfirmed_Returns409()
     {
-        var userId = Guid.NewGuid();
         _mediator.Setup(x => x.Send(It.IsAny<ResendOnboardingEmailCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ResendOnboardingEmailOutcome(
-                ResendOnboardingEmailResult.Fail(ResendOnboardingErrorCode.AlreadyConfirmed, "User has already confirmed")));
+                ResendOnboardingEmailResult.Fail(ResendOnboardingErrorCode.AlreadyConfirmed, "Already confirmed")));
 
-        var result = await _controller.ResendOnboardingEmail(userId, CancellationToken.None);
+        var result = await _controller.ResendOnboardingEmail(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<ConflictObjectResult>();
     }
 
-    [Fact]
-    public async Task GetUsers_ReturnsOkWithPagedResponse()
-    {
-        var users = new List<AppBaseNetReact.Domain.Entities.User>
-        {
-            AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash")
-        };
-        _uow.Setup(x => x.Users.GetPagedAsync(
-            It.IsAny<int>(), It.IsAny<int>(), null,
-            It.IsAny<string?>(), It.IsAny<bool>(),
-            It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AppBaseNetReact.Application.Common.Interfaces.PagedResult<AppBaseNetReact.Domain.Entities.User>
-            {
-                Items = users,
-                TotalCount = 1,
-                Page = 1,
-                PageSize = 10
-            });
-
-        var result = await _controller.GetUsers(page: 1, pageSize: 10, ct: CancellationToken.None);
-
-        result.Should().BeOfType<OkObjectResult>();
-    }
-
-    [Fact]
-    public async Task GetUser_WhenExists_ReturnsOkWithUserDetail()
-    {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-
-        var result = await _controller.GetUser(userId, CancellationToken.None);
-
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var response = ok.Value.Should().BeOfType<ApiResponse<UserDetailDto>>().Subject;
-        response.Success.Should().BeTrue();
-        response.Data!.Email.Should().Be("a@test.com");
-    }
-
-    [Fact]
-    public async Task GetUser_WhenNotExists_ReturnsNotFound()
-    {
-        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
-
-        var result = await _controller.GetUser(Guid.NewGuid(), CancellationToken.None);
-
-        result.Should().BeOfType<NotFoundResult>();
-    }
+    // ── UpdateUser ──
 
     [Fact]
     public async Task UpdateUser_WhenExists_ReturnsOk()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<UpdateUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateUserOutcome(UpdateUserResult.Success()));
 
-        var result = await _controller.UpdateUser(userId,
+        var result = await _controller.UpdateUser(Guid.NewGuid(),
             new UpdateUserRequest("NewFirst", "NewLast", null), CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task UpdateUser_WhenNotExists_ReturnsNotFound()
     {
-        _uow.Setup(x => x.Users.GetByIdWithRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<UpdateUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UpdateUserOutcome(UpdateUserResult.UserNotFound()));
 
         var result = await _controller.UpdateUser(Guid.NewGuid(),
             new UpdateUserRequest("First", "Last", null), CancellationToken.None);
@@ -338,26 +198,25 @@ public class UsersControllerTests
         result.Should().BeOfType<NotFoundResult>();
     }
 
+    // ── ToggleActive ──
+
     [Fact]
     public async Task ToggleActive_WhenExists_ReturnsOk()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<ToggleActiveCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ToggleActiveOutcome(ToggleActiveResult.Success(false)));
 
-        var result = await _controller.ToggleActive(userId,
+        var result = await _controller.ToggleActive(Guid.NewGuid(),
             new ToggleActiveRequest(false), CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task ToggleActive_WhenNotExists_ReturnsNotFound()
     {
-        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<ToggleActiveCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ToggleActiveOutcome(ToggleActiveResult.UserNotFound()));
 
         var result = await _controller.ToggleActive(Guid.NewGuid(),
             new ToggleActiveRequest(true), CancellationToken.None);
@@ -365,114 +224,97 @@ public class UsersControllerTests
         result.Should().BeOfType<NotFoundResult>();
     }
 
+    // ── ResetPassword ──
+
     [Fact]
     public async Task ResetPassword_WhenExists_ReturnsOk()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<AdminResetPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AdminResetPasswordOutcome(AdminResetPasswordResult.Success("TempPass123")));
 
-        var result = await _controller.ResetPassword(userId, CancellationToken.None);
+        var result = await _controller.ResetPassword(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task ResetPassword_WhenNotExists_ReturnsNotFound()
     {
-        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<AdminResetPasswordCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AdminResetPasswordOutcome(AdminResetPasswordResult.UserNotFound()));
 
         var result = await _controller.ResetPassword(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<NotFoundResult>();
     }
 
-    [Fact]
-    public async Task RevokeTokens_CallsRevokeAllAndSaves()
-    {
-        var userId = Guid.NewGuid();
-        var refreshTokens = new Mock<IRefreshTokenRepository>();
-        _uow.Setup(x => x.RefreshTokens).Returns(refreshTokens.Object);
+    // ── RevokeTokens ──
 
-        var result = await _controller.RevokeTokens(userId, CancellationToken.None);
+    [Fact]
+    public async Task RevokeTokens_ReturnsOk()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<RevokeTokensCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RevokeTokensOutcome(RevokeTokensResult.Success()));
+
+        var result = await _controller.RevokeTokens(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
-        refreshTokens.Verify(x => x.RevokeAllForUserAsync(userId, null, It.IsAny<CancellationToken>()), Times.Once);
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    // ── DeleteUser ──
 
     [Fact]
     public async Task DeleteUser_WhenExists_ReturnsOk()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<DeleteUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeleteUserOutcome(DeleteUserResult.Success()));
 
-        var result = await _controller.DeleteUser(userId, CancellationToken.None);
+        var result = await _controller.DeleteUser(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _audit.Verify(x => x.LogAsync(
-            "UserDeleted", "User", userId.ToString(),
-            null, null, It.IsAny<Guid?>(),
-            It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task DeleteUser_WhenNotExists_ReturnsNotFound()
     {
-        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<DeleteUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeleteUserOutcome(DeleteUserResult.UserNotFound()));
 
         var result = await _controller.DeleteUser(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<NotFoundResult>();
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task UploadAvatar_WhenExists_SavesFileAndUpdatesUser()
+    public async Task DeleteUser_WhenDeletingSelf_ReturnsBadRequest()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-        _storage.Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("avatar123.jpg");
+        _mediator.Setup(x => x.Send(It.IsAny<DeleteUserCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DeleteUserOutcome(DeleteUserResult.CannotDeleteSelf()));
 
-        var file = new FormFile(new MemoryStream("image content"u8.ToArray()), 0, 14, "file", "photo.jpg");
-        var result = await _controller.UploadAvatar(userId, file, CancellationToken.None);
-
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        user.AvatarPath.Should().Be("avatar123.jpg");
-        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task UploadAvatar_WhenInvalidExtension_Returns400()
-    {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-
-        var file = new FormFile(new MemoryStream("data"u8.ToArray()), 0, 4, "file", "script.exe");
-        var result = await _controller.UploadAvatar(userId, file, CancellationToken.None);
+        var result = await _controller.DeleteUser(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
-        _storage.Verify(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ── UploadAvatar ──
+
+    [Fact]
+    public async Task UploadAvatar_WhenValidFile_ReturnsOk()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<UploadAvatarCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UploadAvatarOutcome(UploadAvatarResult.Success("avatar123.jpg")));
+
+        var file = new FormFile(new MemoryStream("image content"u8.ToArray()), 0, 14, "file", "photo.jpg");
+        var result = await _controller.UploadAvatar(Guid.NewGuid(), file, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
     public async Task UploadAvatar_WhenNotExists_ReturnsNotFound()
     {
-        _uow.Setup(x => x.Users.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AppBaseNetReact.Domain.Entities.User?)null);
+        _mediator.Setup(x => x.Send(It.IsAny<UploadAvatarCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UploadAvatarOutcome(UploadAvatarResult.UserNotFound()));
 
         var file = new FormFile(new MemoryStream("data"u8.ToArray()), 0, 4, "file", "photo.jpg");
         var result = await _controller.UploadAvatar(Guid.NewGuid(), file, CancellationToken.None);
@@ -481,22 +323,30 @@ public class UsersControllerTests
     }
 
     [Fact]
+    public async Task UploadAvatar_WhenInvalidExtension_Returns400()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<UploadAvatarCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UploadAvatarOutcome(UploadAvatarResult.InvalidExtension(".jpg, .jpeg, .png, .webp")));
+
+        var file = new FormFile(new MemoryStream("data"u8.ToArray()), 0, 4, "file", "script.exe");
+        var result = await _controller.UploadAvatar(Guid.NewGuid(), file, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // ── GetAvatar ──
+
+    [Fact]
     public async Task GetAvatar_WhenExists_ReturnsFile()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        user.SetAvatar("avatar123.jpg");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-
         var tempFile = Path.GetTempFileName();
         File.WriteAllBytes(tempFile, "image bytes"u8.ToArray());
         try
         {
-            _storage.Setup(x => x.GetFilePathAsync("avatar123.jpg"))
-                .ReturnsAsync(tempFile);
+            _mediator.Setup(x => x.Send(It.IsAny<GetAvatarQuery>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GetAvatarOutcome(GetAvatarResult.Success(tempFile, "image/jpeg")));
 
-            var result = await _controller.GetAvatar(userId, CancellationToken.None);
+            var result = await _controller.GetAvatar(Guid.NewGuid(), CancellationToken.None);
 
             result.Should().BeOfType<PhysicalFileResult>();
         }
@@ -509,12 +359,10 @@ public class UsersControllerTests
     [Fact]
     public async Task GetAvatar_WhenNoAvatar_ReturnsNotFound()
     {
-        var userId = Guid.NewGuid();
-        var user = AppBaseNetReact.Domain.Entities.User.Create("a@test.com", "A", "User", "hash");
-        _uow.Setup(x => x.Users.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
+        _mediator.Setup(x => x.Send(It.IsAny<GetAvatarQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GetAvatarOutcome(GetAvatarResult.NoAvatar()));
 
-        var result = await _controller.GetAvatar(userId, CancellationToken.None);
+        var result = await _controller.GetAvatar(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<NotFoundObjectResult>();
     }
