@@ -16,7 +16,7 @@ interface AuthState {
   roles: string[]
   isAuthenticated: boolean
   passwordExpired: boolean
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string, captchaToken?: string) => Promise<boolean>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
 }
@@ -33,8 +33,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   // login: retorna true si el password esta expirado (obliga a cambio de password).
   // Guarda tokens en localStorage para que el Axios interceptor (api.ts) los use en requests subsecuentes.
-  login: async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password })
+  login: async (email, password, captchaToken?: string) => {
+    const { data } = await api.post('/auth/login', { email, password, captchaToken })
     const { accessToken, refreshToken, user: u, permissions: perms, passwordExpired } = data.data
     localStorage.setItem('accessToken', accessToken)
     localStorage.setItem('refreshToken', refreshToken)

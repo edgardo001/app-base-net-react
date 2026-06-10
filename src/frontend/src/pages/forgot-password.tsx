@@ -1,9 +1,10 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CaptchaWidget } from '@/components/auth/captcha-widget'
 import api, { getErrorMessage } from '@/lib/api'
 
 export function ForgotPasswordPage() {
@@ -13,6 +14,7 @@ export function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const captchaTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     api.get('/features').then(({ data }) => {
@@ -21,6 +23,10 @@ export function ForgotPasswordPage() {
     }).catch(() => setChecking(false))
   }, [navigate])
 
+  const handleCaptchaToken = useCallback((token: string | null) => {
+    captchaTokenRef.current = token
+  }, [])
+
   if (checking) return null
 
   const handleSubmit = async (e: FormEvent) => {
@@ -28,7 +34,7 @@ export function ForgotPasswordPage() {
     setError('')
     setLoading(true)
     try {
-      await api.post('/auth/forgot-password', { email })
+      await api.post('/auth/forgot-password', { email, captchaToken: captchaTokenRef.current ?? undefined })
       setSuccess(true)
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Error al procesar solicitud'))
@@ -82,6 +88,7 @@ export function ForgotPasswordPage() {
                 autoFocus
               />
             </div>
+            <CaptchaWidget onToken={handleCaptchaToken} />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Enviando...' : 'Enviar enlace'}
             </Button>

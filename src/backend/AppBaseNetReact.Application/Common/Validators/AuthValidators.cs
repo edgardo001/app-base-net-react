@@ -30,10 +30,10 @@ public class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRe
     }
 }
 
-public record LoginRequest(string Email, string Password);
+public record LoginRequest(string Email, string Password, string? CaptchaToken = null);
 public record RefreshRequest(string RefreshToken);
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
-public record ForgotPasswordRequest(string Email);
+public record ForgotPasswordRequest(string Email, string? CaptchaToken = null);
 public record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
 public record ConfirmEmailRequest(string Token);
 

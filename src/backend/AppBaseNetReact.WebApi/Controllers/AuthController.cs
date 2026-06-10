@@ -41,7 +41,8 @@ public class AuthController : ControllerBase
             request.Password,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             Request.Headers.UserAgent.ToString(),
-            _frontendUrl);
+            _frontendUrl,
+            request.CaptchaToken);
 
         var outcome = await _mediator.Send(command, ct);
 
@@ -139,7 +140,8 @@ public class AuthController : ControllerBase
             request.Email,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             Request.Headers.UserAgent.ToString(),
-            _frontendUrl);
+            _frontendUrl,
+            request.CaptchaToken);
 
         await _mediator.Send(command, ct);
 

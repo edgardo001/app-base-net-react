@@ -14,19 +14,27 @@ public sealed class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswor
     private readonly IUnitOfWork _uow;
     private readonly IDateTimeProvider _clock;
     private readonly IMediator _mediator;
+    private readonly ICaptchaService _captcha;
 
     public ForgotPasswordCommandHandler(
         IUnitOfWork uow,
         IDateTimeProvider clock,
-        IMediator mediator)
+        IMediator mediator,
+        ICaptchaService captcha)
     {
         _uow = uow;
         _clock = clock;
         _mediator = mediator;
+        _captcha = captcha;
     }
 
     public async Task<ForgotPasswordOutcome> Handle(ForgotPasswordCommand request, CancellationToken ct)
     {
+        if (_captcha.IsEnabled && !await _captcha.VerifyTokenAsync(request.CaptchaToken ?? "", ct))
+        {
+            return new ForgotPasswordOutcome(PasswordResult.Success());
+        }
+
         var user = await _uow.Users.GetByEmailAsync(request.Email, ct);
         if (user == null)
             return new ForgotPasswordOutcome(PasswordResult.Success());

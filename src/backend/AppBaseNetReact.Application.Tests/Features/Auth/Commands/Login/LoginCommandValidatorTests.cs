@@ -11,7 +11,7 @@ public class LoginCommandValidatorTests
     public void Validate_WithNonEmailFormatIdentifier_Passes()
     {
         var result = _validator.Validate(
-            new LoginCommand("admin", "admin", "127.0.0.1", "ua", "http://localhost:5173"));
+            new LoginCommand("admin", "admin", "127.0.0.1", "ua", "http://localhost:5173", null));
 
         result.IsValid.Should().BeTrue();
     }
@@ -20,7 +20,7 @@ public class LoginCommandValidatorTests
     public void Validate_WithValidEmailFormat_Passes()
     {
         var result = _validator.Validate(
-            new LoginCommand("user@example.com", "secret", "127.0.0.1", "ua", "http://localhost:5173"));
+            new LoginCommand("user@example.com", "secret", "127.0.0.1", "ua", "http://localhost:5173", null));
 
         result.IsValid.Should().BeTrue();
     }
@@ -29,7 +29,7 @@ public class LoginCommandValidatorTests
     public void Validate_WithEmptyEmail_Fails()
     {
         var result = _validator.Validate(
-            new LoginCommand("", "secret", "127.0.0.1", "ua", "http://localhost:5173"));
+            new LoginCommand("", "secret", "127.0.0.1", "ua", "http://localhost:5173", null));
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == "Email");
@@ -40,7 +40,7 @@ public class LoginCommandValidatorTests
     {
         var longEmail = new string('a', 251) + "@b.com";
         var result = _validator.Validate(
-            new LoginCommand(longEmail, "secret", "127.0.0.1", "ua", "http://localhost:5173"));
+            new LoginCommand(longEmail, "secret", "127.0.0.1", "ua", "http://localhost:5173", null));
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == "Email");
@@ -50,7 +50,7 @@ public class LoginCommandValidatorTests
     public void Validate_WithEmptyPassword_Fails()
     {
         var result = _validator.Validate(
-            new LoginCommand("admin", "", "127.0.0.1", "ua", "http://localhost:5173"));
+            new LoginCommand("admin", "", "127.0.0.1", "ua", "http://localhost:5173", null));
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == "Password");

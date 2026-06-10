@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Infrastructure.Services;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -9,10 +10,17 @@ namespace AppBaseNetReact.WebApi.Controllers;
 public class FeaturesController : ControllerBase
 {
     private readonly EmailOptions _emailOptions;
+    private readonly TurnstileOptions _turnstileOptions;
+    private readonly ICaptchaService _captcha;
 
-    public FeaturesController(IOptions<EmailOptions> emailOptions)
+    public FeaturesController(
+        IOptions<EmailOptions> emailOptions,
+        IOptions<TurnstileOptions> turnstileOptions,
+        ICaptchaService captcha)
     {
         _emailOptions = emailOptions.Value;
+        _turnstileOptions = turnstileOptions.Value;
+        _captcha = captcha;
     }
 
     [HttpGet]
@@ -20,7 +28,9 @@ public class FeaturesController : ControllerBase
     {
         return Ok(new
         {
-            ForgotPasswordEnabled = _emailOptions.ForgotPasswordEnabled
+            ForgotPasswordEnabled = _emailOptions.ForgotPasswordEnabled,
+            CaptchaEnabled = _captcha.IsEnabled,
+            CaptchaSiteKey = _captcha.IsEnabled ? _turnstileOptions.SiteKey : null
         });
     }
 }

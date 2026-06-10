@@ -46,7 +46,8 @@ public class ForgotResetPasswordFlowTests : IClassFixture<TestWebApplicationFact
             testEmail,
             "127.0.0.1",
             "TestAgent",
-            "http://localhost:5173");
+            "http://localhost:5173",
+            null);
 
         var forgotOutcome = await mediator.Send(forgotCommand);
 

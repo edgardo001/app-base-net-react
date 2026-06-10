@@ -6,4 +6,5 @@ public sealed record ForgotPasswordCommand(
     string Email,
     string? IpAddress,
     string? UserAgent,
-    string? FrontendUrl) : IRequest<ForgotPasswordOutcome>;
+    string? FrontendUrl,
+    string? CaptchaToken) : IRequest<ForgotPasswordOutcome>;

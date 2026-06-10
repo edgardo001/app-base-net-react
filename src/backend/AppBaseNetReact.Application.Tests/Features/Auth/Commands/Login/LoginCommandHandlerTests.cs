@@ -17,6 +17,7 @@ public class LoginCommandHandlerTests
     private readonly Mock<IPasswordPolicyService> _passwordPolicy = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly Mock<IMediator> _mediator = new();
+    private readonly Mock<ICaptchaService> _captcha = new();
     private readonly LoginCommandHandler _handler;
 
     public LoginCommandHandlerTests()
@@ -29,10 +30,11 @@ public class LoginCommandHandlerTests
         _uow.Setup(x => x.RefreshTokens.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((RefreshToken t, CancellationToken _) => t);
         _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _captcha.Setup(x => x.IsEnabled).Returns(false);
 
         _handler = new LoginCommandHandler(
             _uow.Object, _jwt.Object, _hasher.Object,
-            _passwordPolicy.Object, _clock.Object, _mediator.Object);
+            _passwordPolicy.Object, _clock.Object, _mediator.Object, _captcha.Object);
     }
 
     private static User CreateActiveConfirmedUser(string email = "active@test.com")
@@ -55,7 +57,7 @@ public class LoginCommandHandlerTests
         _jwt.Setup(x => x.HashRefreshToken("refresh-token")).Returns("refresh-hash");
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", "http://localhost:5173"),
+            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", "http://localhost:5173", null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.None);
@@ -78,7 +80,7 @@ public class LoginCommandHandlerTests
         _hasher.Setup(x => x.VerifyPassword("wrong", user.PasswordHash)).Returns(false);
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "wrong", "127.0.0.1", "ua", null),
+            new LoginCommand(user.Email, "wrong", "127.0.0.1", "ua", null, null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.InvalidCredentials);
@@ -95,7 +97,7 @@ public class LoginCommandHandlerTests
             .ReturnsAsync((User?)null);
 
         var outcome = await _handler.Handle(
-            new LoginCommand("ghost@test.com", "any", "127.0.0.1", "ua", null),
+            new LoginCommand("ghost@test.com", "any", "127.0.0.1", "ua", null, null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.InvalidCredentials);
@@ -117,7 +119,7 @@ public class LoginCommandHandlerTests
         _hasher.Setup(x => x.VerifyPassword("plain", user.PasswordHash)).Returns(true);
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null),
+            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null, null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.AccountDeactivated);
@@ -134,7 +136,7 @@ public class LoginCommandHandlerTests
         _hasher.Setup(x => x.VerifyPassword("plain", user.PasswordHash)).Returns(true);
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null),
+            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null, null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.AccountLocked);
@@ -151,7 +153,7 @@ public class LoginCommandHandlerTests
         _hasher.Setup(x => x.VerifyPassword("plain", user.PasswordHash)).Returns(true);
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null),
+            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null, null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.EmailNotConfirmed);
@@ -168,7 +170,7 @@ public class LoginCommandHandlerTests
         _hasher.Setup(x => x.VerifyPassword("wrong", user.PasswordHash)).Returns(false);
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "wrong", "127.0.0.1", "ua", "http://localhost:5173"),
+            new LoginCommand(user.Email, "wrong", "127.0.0.1", "ua", "http://localhost:5173", null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.InvalidCredentials);
@@ -192,7 +194,7 @@ public class LoginCommandHandlerTests
         _jwt.Setup(x => x.HashRefreshToken("refresh-token")).Returns("refresh-hash");
 
         var outcome = await _handler.Handle(
-            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null),
+            new LoginCommand(user.Email, "plain", "127.0.0.1", "ua", null, null),
             CancellationToken.None);
 
         outcome.Result.ErrorCode.Should().Be(LoginErrorCode.None);

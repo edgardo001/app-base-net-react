@@ -7,4 +7,5 @@ public sealed record LoginCommand(
     string Password,
     string? IpAddress,
     string? UserAgent,
-    string? FrontendUrl) : IRequest<LoginOutcome>;
+    string? FrontendUrl,
+    string? CaptchaToken) : IRequest<LoginOutcome>;

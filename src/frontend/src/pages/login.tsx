@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import api, { getErrorMessage } from '@/lib/api'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CaptchaWidget } from '@/components/auth/captcha-widget'
 import { Moon, Sun, RefreshCw, WifiOff, AlertCircle } from 'lucide-react'
 
 export function LoginPage() {
@@ -21,11 +22,16 @@ export function LoginPage() {
   const [errorType, setErrorType] = useState<'credential' | 'network' | 'locked' | 'unknown'>('unknown')
   const [loading, setLoading] = useState(false)
   const [forgotEnabled, setForgotEnabled] = useState(true)
+  const captchaTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     api.get('/features').then(({ data }) => {
       setForgotEnabled(data.forgotPasswordEnabled !== false)
     }).catch(() => {})
+  }, [])
+
+  const handleCaptchaToken = useCallback((token: string | null) => {
+    captchaTokenRef.current = token
   }, [])
 
   const handleSubmit = async (e?: FormEvent) => {
@@ -34,7 +40,7 @@ export function LoginPage() {
     setErrorType('unknown')
     setLoading(true)
     try {
-      const expired = await login(email, password)
+      const expired = await login(email, password, captchaTokenRef.current ?? undefined)
       navigate(expired ? '/change-password' : '/dashboard')
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'Error al iniciar sesión')
@@ -115,6 +121,7 @@ export function LoginPage() {
                 disabled={loading}
               />
             </div>
+            <CaptchaWidget onToken={handleCaptchaToken} />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>

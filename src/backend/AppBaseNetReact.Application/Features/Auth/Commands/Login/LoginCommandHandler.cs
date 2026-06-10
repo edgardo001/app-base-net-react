@@ -20,6 +20,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginOut
     private readonly IPasswordPolicyService _passwordPolicy;
     private readonly IDateTimeProvider _clock;
     private readonly IMediator _mediator;
+    private readonly ICaptchaService _captcha;
 
     public LoginCommandHandler(
         IUnitOfWork uow,
@@ -27,7 +28,8 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginOut
         IPasswordHasherService hasher,
         IPasswordPolicyService passwordPolicy,
         IDateTimeProvider clock,
-        IMediator mediator)
+        IMediator mediator,
+        ICaptchaService captcha)
     {
         _uow = uow;
         _jwt = jwt;
@@ -35,10 +37,16 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginOut
         _passwordPolicy = passwordPolicy;
         _clock = clock;
         _mediator = mediator;
+        _captcha = captcha;
     }
 
     public async Task<LoginOutcome> Handle(LoginCommand request, CancellationToken ct)
     {
+        if (_captcha.IsEnabled && !await _captcha.VerifyTokenAsync(request.CaptchaToken ?? "", ct))
+        {
+            return new LoginOutcome(LoginResult.Fail(LoginErrorCode.InvalidCredentials, "Invalid email or password"), null);
+        }
+
         var ip = request.IpAddress ?? "unknown";
         var ua = request.UserAgent ?? "unknown";
         var user = await _uow.Users.GetByEmailAsync(request.Email, ct);
