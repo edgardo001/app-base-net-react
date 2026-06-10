@@ -47,6 +47,16 @@ export function extractRoles(token: string | null | undefined): string[] {
   return []
 }
 
+export function extractPermissions(token: string | null | undefined): string[] {
+  if (!token) return []
+  const payload = decodeJwt(token)
+  if (!payload) return []
+  const claim = payload['permission']
+  if (Array.isArray(claim)) return claim.filter((p): p is string => typeof p === 'string')
+  if (typeof claim === 'string') return [claim]
+  return []
+}
+
 export const ROLE_CLAIM_NAMES = {
   // El nombre exacto que el backend usa para emitir el claim de rol
   ClaimTypesRole: ROLE_CLAIM_URI,

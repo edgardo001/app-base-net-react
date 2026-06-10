@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 import {
   LayoutDashboard,
   Users,
@@ -12,16 +13,23 @@ import {
   BookType,
 } from 'lucide-react'
 
-const navItems = [
+interface NavItem {
+  to: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  requiredPermission?: string
+}
+
+const allNavItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/users', label: 'Usuarios', icon: Users },
-  { to: '/roles', label: 'Roles', icon: Shield },
-  { to: '/permissions', label: 'Permisos', icon: KeyRound },
+  { to: '/users', label: 'Usuarios', icon: Users, requiredPermission: 'users:list' },
+  { to: '/roles', label: 'Roles', icon: Shield, requiredPermission: 'roles:list' },
+  { to: '/permissions', label: 'Permisos', icon: KeyRound, requiredPermission: 'permissions:list' },
   { to: '/profile', label: 'Perfil', icon: UserCircle },
-  { to: '/admin', label: 'Admin', icon: ShieldCheck },
-  { to: '/tipo-a', label: 'Tipo A', icon: AArrowDown },
-  { to: '/tipo-b', label: 'Tipo B', icon: Binary },
-  { to: '/tipo-c', label: 'Tipo C', icon: BookType },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck, requiredPermission: 'admin:dashboard' },
+  { to: '/tipo-a', label: 'Tipo A', icon: AArrowDown, requiredPermission: 'page-a:view' },
+  { to: '/tipo-b', label: 'Tipo B', icon: Binary, requiredPermission: 'page-b:view' },
+  { to: '/tipo-c', label: 'Tipo C', icon: BookType, requiredPermission: 'page-c:view' },
 ]
 
 interface SidebarProps {
@@ -31,6 +39,12 @@ interface SidebarProps {
 }
 
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
+  const permissions = useAuthStore((s) => s.permissions)
+
+  const visibleItems = allNavItems.filter(
+    (item) => !item.requiredPermission || permissions.includes(item.requiredPermission),
+  )
+
   return (
     <>
       <div className={cn(
@@ -40,7 +54,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         {collapsed ? 'UM' : 'UserMVP'}
       </div>
       <nav className="flex flex-1 flex-col gap-1">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {visibleItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

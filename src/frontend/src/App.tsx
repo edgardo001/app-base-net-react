@@ -16,6 +16,7 @@ import { TipoBPage } from '@/pages/tipo-b'
 import { TipoCPage } from '@/pages/tipo-c'
 import { Layout } from '@/components/layout/layout'
 import { ProtectedRoute } from '@/components/auth/protected-route'
+import { AuthorizedRoute } from '@/components/auth/authorized-route'
 
 export default function App() {
   return (
@@ -30,14 +31,14 @@ export default function App() {
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/roles" element={<RolesPage />} />
-          <Route path="/permissions" element={<PermissionsPage />} />
+          <Route path="/users" element={<AuthorizedRoute requiredPermission="users:list"><UsersPage /></AuthorizedRoute>} />
+          <Route path="/roles" element={<AuthorizedRoute requiredPermission="roles:list"><RolesPage /></AuthorizedRoute>} />
+          <Route path="/permissions" element={<AuthorizedRoute requiredPermission="permissions:list"><PermissionsPage /></AuthorizedRoute>} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/tipo-a" element={<TipoAPage />} />
-          <Route path="/tipo-b" element={<TipoBPage />} />
-          <Route path="/tipo-c" element={<TipoCPage />} />
+          <Route path="/admin" element={<AuthorizedRoute requiredPermission="admin:dashboard"><AdminPage /></AuthorizedRoute>} />
+          <Route path="/tipo-a" element={<AuthorizedRoute requiredPermission="page-a:view"><TipoAPage /></AuthorizedRoute>} />
+          <Route path="/tipo-b" element={<AuthorizedRoute requiredPermission="page-b:view"><TipoBPage /></AuthorizedRoute>} />
+          <Route path="/tipo-c" element={<AuthorizedRoute requiredPermission="page-c:view"><TipoCPage /></AuthorizedRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

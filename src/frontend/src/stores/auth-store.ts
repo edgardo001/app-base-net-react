@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import api from '@/lib/api'
-import { extractRoles } from '@/lib/jwt'
+import { extractRoles, extractPermissions } from '@/lib/jwt'
 
 interface User {
   id: string
@@ -26,8 +26,8 @@ interface AuthState {
 // Selector-based subscriptions: componentes usan useAuthStore((s) => s.user) para re-render solo cuando user cambia.
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  permissions: [],
   roles: extractRoles(localStorage.getItem('accessToken')),
+  permissions: extractPermissions(localStorage.getItem('accessToken')),
   isAuthenticated: !!localStorage.getItem('accessToken'),
   passwordExpired: false,
 
@@ -72,7 +72,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { data } = await api.get('/profile')
       const user = data.data
-      set({ user, roles: extractRoles(token), isAuthenticated: true })
+      set({ user, roles: extractRoles(token), permissions: extractPermissions(token), isAuthenticated: true })
     } catch {
       set({ isAuthenticated: false })
     }
