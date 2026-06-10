@@ -155,6 +155,39 @@ Los módulos **Auth** y **Users** están migrados a CQRS con handlers MediatR (`
 | GET | `/api/dashboard/stats` | Estadísticas del dashboard | JWT |
 | GET | `/scalar/v1` | Documentación interactiva API | No |
 
+## Acceso a Base de Datos (Seguro)
+
+> ⚠️ **Nunca expongas PostgreSQL directamente a internet.** Usa siempre un túnel SSH o la API REST.
+
+### Vía túnel SSH (recomendado para administración)
+
+```bash
+# 1. Túnel SSH — puerto local 5433 → Postgres del servidor
+ssh -i "ruta/a/tu-key" -L 5433:localhost:5432 usuario@IP-DEL-SERVIDOR -N
+
+# 2. Conectar a localhost:5433 con cualquier cliente
+psql -h localhost -p 5433 -U mvp-usuarios-db -d mvp-usuarios-db
+```
+
+**Requisitos**: Llave SSH configurada, contenedor Postgres corriendo en el servidor, puerto 5432 no expuesto al firewall público.
+
+### Vía API REST (recomendado para aplicaciones)
+
+El backend expone endpoints seguros con autenticación JWT. Ejemplo:
+
+```bash
+# Obtener token
+curl -s https://api.tudominio.cl/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@sistema.local","password":"admin"}'
+
+# Consultar datos (reemplaza <token> con el JWT recibido)
+curl -s https://api.tudominio.cl/api/users \
+  -H "Authorization: Bearer <token>"
+```
+
+**Ventajas**: Autenticación JWT, rate limiting, auditoría, sin exponer credenciales de DB.
+
 ## Características de seguridad
 
 - **JWT HS512** — Tokens de acceso de 15 min + refresh token de 7 días con rotación
