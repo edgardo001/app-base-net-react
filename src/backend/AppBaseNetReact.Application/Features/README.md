@@ -7,8 +7,8 @@ Estructura implementada con el patrón CQRS. Cada feature tiene su propia carpet
 | `Auth/` | Login, refresh, logout, cambio de contraseña, forgot/reset password, confirm email | ✅ Migrado |
 | `Users/` | CRUD de usuarios, activar/desactivar, reset password, revocar tokens, avatar | ✅ Migrado |
 | `Roles/` | CRUD de roles, asignar permisos | 🏗️ Pendiente |
-| `Permissions/` | Listar permisos agrupados por módulo | 🏗️ Pendiente |
-| `Profile/` | Ver/actualizar perfil, actividad reciente | 🏗️ Pendiente |
+| `Permissions/` | Listar permisos agrupados por módulo | ✅ Migrado |
+| `Profile/` | Ver/actualizar perfil, actividad reciente | ✅ Migrado |
 | `Dashboard/` | Estadísticas del dashboard | 🏗️ Pendiente |
 | `Audit/` | Log de auditoría global | 🏗️ Pendiente |
 
