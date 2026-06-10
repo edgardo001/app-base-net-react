@@ -37,7 +37,6 @@ appsettings.json             — Configuración (JWT, ConnectionStrings, Passwor
 ExceptionHandling → SecurityHeaders → RateLimiting → CORS → Auth → Authorization → Controllers
 ```
 
-## ⚡ Estado actual
+## ✅ Estado actual
 
-Los controllers inyectan `IUnitOfWork` + servicios y ejecutan la lógica directamente.
-Todos los controladores están migrados y delegan en **handlers CQRS** en `Application/Features/` via `MediatR.Send()`.
+Todos los controladores delegan en **handlers CQRS** en `Application/Features/` via `MediatR.Send()`. Ningún controller inyecta `IUnitOfWork` directamente.

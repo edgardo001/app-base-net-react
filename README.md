@@ -97,14 +97,13 @@ graph TD
     Infrastructure -.->|"Implementa"| Ports
 ```
 
-### Flujo Actual vs Target
+### Estado CQRS
 
-| Fase | ¿Quién orquesta? | ¿Dónde? |
-|------|-----------------|---------|
-| ⚡ **Actual** | Controller (via `IUnitOfWork`) | `WebApi/Controllers/*Controller.cs` |
-| 🎯 **Target** | CQRS Handler (via MediatR) | `Application/Features/*/Commands|Queries/*Handler.cs` |
+| ¿Quién orquesta? | ¿Dónde? |
+|-----------------|---------|
+| ✅ CQRS Handler (via MediatR) | `Application/Features/*/Commands\|Queries/*Handler.cs` |
 
-Los módulos **Auth**, **Users** y **Roles** están migrados a CQRS con handlers MediatR (`Application/Features/`). Los controllers inyectan solo `IMediator` y delegan la lógica de negocio a los handlers. Todos los módulos están migrados a CQRS handlers MediatR.
+Todos los controladores están migrados a CQRS: inyectan solo `IMediator` y delegan la lógica de negocio a handlers en `Application/Features/` (Auth, Users, Roles, Permissions, Profile, Admin).
 
 ## Estructura del proyecto
 

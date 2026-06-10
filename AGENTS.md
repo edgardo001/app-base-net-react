@@ -70,10 +70,10 @@ graph TD
             ISvc["IJwtService<br/>IPasswordHasherService<br/>IEmailService<br/>..."]
             IUoW["IUnitOfWork"]
         end
-        subgraph CQRS["📁 CQRS (Estructural — Pendiente)"]
+        subgraph CQRS["📁 CQRS (Migrado ✅)"]
             Cmds["Commands/"]
             Qrys["Queries/"]
-            Handlers["Handlers<br/>(a implementar)"]
+            Handlers["Handlers<br/>(Auth, Users, Roles, Permissions, Profile, Admin)"]
             Validators["FluentValidation<br/>Validators"]
         end
         Behaviors["MediatR Pipeline<br/>ValidationBehavior"]
@@ -120,32 +120,19 @@ graph TD
     Hasher -->|"Hash/Verify"| Controllers
 ```
 
-### Flujo de Ejecución — Situación Actual vs Target
+### Flujo de Ejecución — CQRS
 
 ```mermaid
 graph LR
     subgraph Legend["Leyenda"]
-        L1["⚡ Actual (controladores orquestan)"]
-        L2["🎯 Target (CQRS con handlers)"]
-        L3["🟢 Ambos flujos coexisten"]
+        L1["✅ Todos los controllers delegan en handlers CQRS"]
     end
 
     subgraph Client["Cliente HTTP"]
         Req["Request<br/>POST /api/auth/login"]
     end
 
-    subgraph Current["⚡ FLUJO ACTUAL"]
-        direction TB
-        C1["Controller<br/>AuthController.Login"]
-        C2["IUnitOfWork.Users<br/>.GetByEmailAsync()"]
-        C3["User entity<br/>MarkLogin(), LockUntil()<br/>IncrementFailedAccess()"]
-        C4["IUnitOfWork<br/>.SaveChangesAsync()"]
-        C5["IJwtService<br/>.GenerateAccessToken()"]
-        C6["ApiResponse&lt;T&gt;<br/>return Ok/Fail"]
-        C1 --> C2 --> C3 --> C4 --> C5 --> C6
-    end
-
-    subgraph Target["🎯 FLUJO TARGET (CQRS)"]
+    subgraph Flow["🎯 FLUJO CQRS"]
         direction TB
         T1["Controller<br/>AuthController.Login"]
         T2["MediatR.Send<br/>(LoginCommand)"]
@@ -156,12 +143,10 @@ graph LR
         T1 --> T2 --> T3 --> T4 --> T5 --> T6
     end
 
-    Req -->|"⚡"| Current
-    Req -->|"🎯"| Target
+    Req --> Flow
 
     style Legend fill:#f5f5f5,stroke:#999
-    style Current fill:#fff3cd,stroke:#ffc107
-    style Target fill:#d4edda,stroke:#28a745
+    style Flow fill:#d4edda,stroke:#28a745
 ```
 
 ### ¿Dónde ocurre la acción?

@@ -6,13 +6,9 @@ Estructura implementada con el patrón CQRS. Cada feature tiene su propia carpet
 |---------|-----------|--------|
 | `Auth/` | Login, refresh, logout, cambio de contraseña, forgot/reset password, confirm email | ✅ Migrado |
 | `Users/` | CRUD de usuarios, activar/desactivar, reset password, revocar tokens, avatar | ✅ Migrado |
-| `Roles/` | CRUD de roles, asignar permisos | 🏗️ Pendiente |
+| `Roles/` | CRUD de roles, asignar permisos | ✅ Migrado |
 | `Permissions/` | Listar permisos agrupados por módulo | ✅ Migrado |
 | `Profile/` | Ver/actualizar perfil, actividad reciente | ✅ Migrado |
 | `Admin/` | Dashboard, auditoría, revocar tokens, test email | ✅ Migrado |
-| `Dashboard/` | Estadísticas del dashboard | 🏗️ Pendiente |
-| `Audit/` | Log de auditoría global | 🏗️ Pendiente |
 
-> ✅ **Auth:** 7 commands, 8 handlers, 11 notifications — migrado en `openspec/changes/cqrs-auth-*`.
-> ✅ **Users:** 2 queries, 7 commands, 8 notifications — migrado en `openspec/changes/cqrs-users-management`.
-> 🏗️ **Roles** es el siguiente módulo pendiente de migración.
+> Todos los módulos migrados a CQRS. Dashboard y Audit viven dentro de `Admin/` feature.

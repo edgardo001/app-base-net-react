@@ -1,9 +1,9 @@
 # Email — Servicio de Correo Electrónico
 
-Espacio reservado para la implementación del envío de correos transaccionales (bienvenida, confirmación de email, forgot password, etc.).
+Implementación del envío de correos transaccionales.
 
 | Carpeta | Propósito |
 |---------|-----------|
-| `Templates/` | Plantillas HTML de correos (pendiente) |
+| `Templates/` | Plantillas HTML de correos (welcome, password-reset, email-confirmation, account-locked, etc.) |
 
-Dependencias esperadas: `IEmailService` definido en `Application/Common/Interfaces/`.
+Dependencias: `IEmailService` definido en `Application/Common/Interfaces/`, `EmailRenderer` para templates embebidos.
