@@ -1,8 +1,11 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Validators;
+using AppBaseNetReact.Application.Features.Profile.Commands.UpdateProfile;
+using AppBaseNetReact.Application.Features.Profile.Commands.UploadAvatar;
+using AppBaseNetReact.Application.Features.Profile.Queries.GetActivity;
+using AppBaseNetReact.Application.Features.Profile.Queries.GetProfile;
 using AppBaseNetReact.WebApi.Filters;
 
 namespace AppBaseNetReact.WebApi.Controllers;
@@ -12,57 +15,35 @@ namespace AppBaseNetReact.WebApi.Controllers;
 [Authorize]
 public class ProfileController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IAuditService _audit;
-    private readonly IFileStorageService _storage;
-    private readonly StorageOptions _storageOptions;
+    private readonly IMediator _mediator;
 
-    public ProfileController(IUnitOfWork uow, IAuditService audit, IFileStorageService storage, IOptions<StorageOptions> storageOptions)
+    public ProfileController(IMediator mediator)
     {
-        _uow = uow;
-        _audit = audit;
-        _storage = storage;
-        _storageOptions = storageOptions.Value;
+        _mediator = mediator;
     }
 
-[HttpGet]
-public async Task<IActionResult> GetProfile(CancellationToken ct)
-{
-    var userIdClaim = User.FindFirst("sub")?.Value;
-    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        return Unauthorized();
-
-    var user = await _uow.Users.GetByIdAsync(userId, ct);
-    if (user == null)
-        return NotFound();
-
-    return Ok(ApiResponse<object>.Ok(new
-    {
-        user.Id,
-        user.Email,
-        user.FirstName,
-        user.LastName,
-        user.AvatarPath
-    }));
-}
-
-[HttpGet("activity")]
-public async Task<IActionResult> GetActivity(CancellationToken ct)
+    [HttpGet]
+    public async Task<IActionResult> GetProfile(CancellationToken ct)
     {
         var userIdClaim = User.FindFirst("sub")?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        var logs = await _uow.AuditLogs.GetByUserAsync(userId, 20, ct);
-        var items = logs.Select(l => new
-        {
-            l.Action,
-            l.EntityType,
-            l.Details,
-            l.CreatedAt
-        });
+        var result = await _mediator.Send(new GetProfileQuery(userId), ct);
+        if (result == null) return NotFound();
 
-        return Ok(ApiResponse<object>.Ok(items));
+        return Ok(ApiResponse<GetProfileResponse>.Ok(result));
+    }
+
+    [HttpGet("activity")]
+    public async Task<IActionResult> GetActivity(CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirst("sub")?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var result = await _mediator.Send(new GetActivityQuery(userId), ct);
+        return Ok(ApiResponse<GetActivityResponse>.Ok(result));
     }
 
     [HttpPut]
@@ -72,23 +53,21 @@ public async Task<IActionResult> GetActivity(CancellationToken ct)
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        var user = await _uow.Users.GetByIdAsync(userId, ct);
-        if (user == null)
-            return NotFound();
-
-        var oldFirstName = user.FirstName;
-        var oldLastName = user.LastName;
-        var oldValues = $"{{\"firstName\":\"{oldFirstName}\",\"lastName\":\"{oldLastName}\"}}";
-        var newValues = $"{{\"firstName\":\"{request.FirstName}\",\"lastName\":\"{request.LastName}\"}}";
-
-        user.UpdateProfile(request.FirstName, request.LastName);
-        await _uow.SaveChangesAsync(ct);
-
-        await _audit.LogAsync(
-            "ProfileUpdated", "User", user.Id.ToString(),
-            oldValues, newValues, userId,
+        var outcome = await _mediator.Send(new UpdateProfileCommand(
+            userId,
+            request.FirstName,
+            request.LastName,
             HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            Request.Headers.UserAgent.ToString(), null, ct);
+            Request.Headers.UserAgent.ToString()), ct);
+
+        if (!outcome.Result.IsSuccess)
+        {
+            return outcome.Result.ErrorCode switch
+            {
+                "UserNotFound" => NotFound(),
+                _ => BadRequest(ApiResponse<object>.Fail("Profile update failed"))
+            };
+        }
 
         return Ok(ApiResponse<object>.Ok("Profile updated"));
     }
@@ -101,20 +80,24 @@ public async Task<IActionResult> GetActivity(CancellationToken ct)
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        var user = await _uow.Users.GetByIdAsync(userId, ct);
-        if (user == null) return NotFound();
-
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!_storageOptions.AllowedExtensions.Contains(ext))
-            return BadRequest(ApiResponse<object>.Fail($"File type not allowed. Allowed: {string.Join(", ", _storageOptions.AllowedExtensions)}"));
 
-        if (file.Length > _storageOptions.MaxFileSize)
-            return BadRequest(ApiResponse<object>.Fail($"File size exceeds maximum of {_storageOptions.MaxFileSize} bytes"));
+        var outcome = await _mediator.Send(
+            new UploadAvatarCommand(userId, file.OpenReadStream(), ext, file.FileName), ct);
 
-        var fileName = await _storage.SaveFileAsync(file.OpenReadStream(), ext, ct);
-        user.SetAvatar(fileName);
-        await _uow.SaveChangesAsync(ct);
+        if (!outcome.Result.IsSuccess)
+        {
+            return outcome.Result.ErrorCode switch
+            {
+                "UserNotFound" => NotFound(),
+                "InvalidExtension" => BadRequest(ApiResponse<object>.Fail(
+                    $"File type not allowed.")),
+                "FileTooLarge" => BadRequest(ApiResponse<object>.Fail(
+                    $"File size exceeds maximum allowed.")),
+                _ => BadRequest(ApiResponse<object>.Fail("Avatar upload failed"))
+            };
+        }
 
-        return Ok(ApiResponse<object>.Ok(new { fileName }));
+        return Ok(ApiResponse<object>.Ok(new { fileName = outcome.FileName }));
     }
 }
