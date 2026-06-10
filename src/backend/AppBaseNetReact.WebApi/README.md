@@ -2,7 +2,7 @@
 
 ## Propósito
 
-Capa de presentación que expone la API REST. Es el **punto de entrada** de la aplicación. Orquesta las peticiones HTTP y delega en los casos de uso (actualmente vía `IUnitOfWork`, target: MediatR CQRS).
+Capa de presentación que expone la API REST. Es el **punto de entrada** de la aplicación. Orquesta las peticiones HTTP y delega en handlers CQRS via `IMediator.Send()`.
 
 ## Dependencias
 
@@ -40,4 +40,4 @@ ExceptionHandling → SecurityHeaders → RateLimiting → CORS → Auth → Aut
 ## ⚡ Estado actual
 
 Los controllers inyectan `IUnitOfWork` + servicios y ejecutan la lógica directamente.
-El target es migrar a **handlers CQRS** en `Application/Features/`, donde los controllers solo llamen `MediatR.Send()`.
+Todos los controladores están migrados y delegan en **handlers CQRS** en `Application/Features/` via `MediatR.Send()`.

@@ -28,13 +28,12 @@ Common/
   Validators/
     AuthValidators.cs, ProfileValidators.cs, RoleValidators.cs, etc.
 Features/
-  Auth/     — Commands/ + Queries/ (pendiente de implementar) + Validators
-  Users/    — Commands/ + Queries/ (pendiente)
-  Roles/    — Commands/ + Queries/ (pendiente)
-  Permissions/
-  Profile/
-  Dashboard/
-  Audit/
+  Auth/     — Commands/ + Queries/ ✅
+  Users/    — Commands/ + Queries/ ✅
+  Roles/    — Commands/ + Queries/ ✅
+  Permissions/ — Queries/ ✅
+  Profile/  — Commands/ + Queries/ ✅
+  Admin/    — Commands/ + Queries/ ✅
 DependencyInjection.cs        — RegisterServices(): AddMediatR, AddFluentValidation, AddAutoMapper
 ```
 
@@ -42,7 +41,6 @@ DependencyInjection.cs        — RegisterServices(): AddMediatR, AddFluentValid
 
 | Estado | Responsable | Ubicación actual |
 |--------|------------|------------------|
-| ⚡ Actual | Controllers (vía IUnitOfWork) | `WebApi/Controllers/*` |
-| 🎯 Target | Handlers CQRS | `Features/*/Commands|Queries/*Handler.cs` (a implementar) |
+| ✅ Actual | Handlers CQRS | `Features/*/Commands|Queries/*Handler.cs` |
 
 > 🔌 **Puertos definidos aquí**: Las interfaces en `Common/Interfaces/` son contratos que `Infrastructure` implementa. La capa de aplicación nunca conoce las implementaciones concretas.

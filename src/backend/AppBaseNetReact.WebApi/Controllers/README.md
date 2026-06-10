@@ -11,4 +11,4 @@ Controladores que exponen los endpoints HTTP. Inyectan `IUnitOfWork` + servicios
 | `ProfileController` | `GET /`, `PUT /`, `GET /activity` | JWT |
 | `AdminController` | `GET /dashboard/stats`, `GET /audit-log`, `POST /revoke-all-tokens` | JWT |
 
-> ⚡ **Estado actual:** Los controllers orquestan la lógica directamente. Target: migrar a handlers CQRS donde los controllers solo llamen `MediatR.Send()`.
+> ✅ **Estado actual:** Todos los controllers delegan en handlers CQRS via `IMediator.Send()`. La lógica de negocio reside en `Application/Features/`.

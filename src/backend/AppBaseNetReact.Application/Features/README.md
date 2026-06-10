@@ -9,6 +9,7 @@ Estructura implementada con el patrón CQRS. Cada feature tiene su propia carpet
 | `Roles/` | CRUD de roles, asignar permisos | 🏗️ Pendiente |
 | `Permissions/` | Listar permisos agrupados por módulo | ✅ Migrado |
 | `Profile/` | Ver/actualizar perfil, actividad reciente | ✅ Migrado |
+| `Admin/` | Dashboard, auditoría, revocar tokens, test email | ✅ Migrado |
 | `Dashboard/` | Estadísticas del dashboard | 🏗️ Pendiente |
 | `Audit/` | Log de auditoría global | 🏗️ Pendiente |
 

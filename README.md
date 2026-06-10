@@ -73,7 +73,7 @@ graph TD
 
     subgraph Application["Application (Casos de Uso)"]
         Ports["🔌 Puertos (Interfaces)<br/>IRepository, IUnitOfWork<br/>IJwtService, IPasswordHasher"]
-        CQRS["📁 CQRS<br/>Commands/ Queries/<br/>Handlers (Auth, Users, Roles ✅<br/>Permissions, Profile ✅)"]
+        CQRS["📁 CQRS<br/>Commands/ Queries/<br/>Handlers (Auth, Users, Roles ✅<br/>Permissions, Profile, Admin ✅)"]
     end
 
     subgraph Domain["Domain (Núcleo)"]
@@ -104,7 +104,7 @@ graph TD
 | ⚡ **Actual** | Controller (via `IUnitOfWork`) | `WebApi/Controllers/*Controller.cs` |
 | 🎯 **Target** | CQRS Handler (via MediatR) | `Application/Features/*/Commands|Queries/*Handler.cs` |
 
-Los módulos **Auth**, **Users** y **Roles** están migrados a CQRS con handlers MediatR (`Application/Features/`). Los controllers inyectan solo `IMediator` y delegan la lógica de negocio a los handlers. Los módulos restantes (Dashboard, Audit) aún usan `IUnitOfWork` directamente en los controllers.
+Los módulos **Auth**, **Users** y **Roles** están migrados a CQRS con handlers MediatR (`Application/Features/`). Los controllers inyectan solo `IMediator` y delegan la lógica de negocio a los handlers. Todos los módulos están migrados a CQRS handlers MediatR.
 
 ## Estructura del proyecto
 
