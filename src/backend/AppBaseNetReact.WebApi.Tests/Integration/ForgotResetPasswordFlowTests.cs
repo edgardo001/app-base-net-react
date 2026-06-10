@@ -13,6 +13,7 @@ using AppBaseNetReact.Infrastructure.Services;
 
 namespace AppBaseNetReact.WebApi.Tests.Integration;
 
+[Collection("Integration")]
 public class ForgotResetPasswordFlowTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly TestWebApplicationFactory _factory;
