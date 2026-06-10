@@ -25,8 +25,8 @@
 
 - [x] 5.1 Create `openspec/changes/user-creation-email-confirmation/` with `.openspec.yaml`, `proposal.md`, `design.md`, `specs/user-creation/spec.md`, `tasks.md`.
 - [x] 5.2 Add 5 requirements under the new `user-creation` capability: persist-with-unconfirmed-email, duplicate-email-rejected, confirmation-token-generated-and-stored, email-confirmation-email-sent-on-creation, existing-auth-confirm-flow-closes-the-loop.
-- [ ] 5.3 Run `openspec validate user-creation-email-confirmation --strict` and confirm `"Change 'user-creation-email-confirmation' is valid"`.
-- [ ] 5.4 Run `openspec archive user-creation-email-confirmation -y` to sync 5 requirements to `openspec/specs/user-creation/spec.md`. Expect `+ 5 added`.
+- [x] 5.3 Run `openspec validate user-creation-email-confirmation --strict` and confirm `"Change 'user-creation-email-confirmation' is valid"`.
+- [x] 5.4 Run `openspec archive user-creation-email-confirmation -y` to sync 5 requirements to `openspec/specs/user-creation/spec.md`. Expect `+ 5 added`.
 
 ## 6. Final validation
 

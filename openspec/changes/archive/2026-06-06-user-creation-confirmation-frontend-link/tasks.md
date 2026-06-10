@@ -30,12 +30,12 @@
 
 - [x] 6.1 Create `openspec/changes/user-creation-confirmation-frontend-link/` with `.openspec.yaml`, `proposal.md`, `design.md`, `specs/user-creation/spec.md`, `tasks.md`.
 - [x] 6.2 Add 2 new requirements under the existing `user-creation` capability: "Confirmation Link Points To Configured Frontend URL" (3 scenarios) and "Frontend Provides A Public Confirm-Email Page" (4 scenarios).
-- [ ] 6.3 Run `openspec validate user-creation-confirmation-frontend-link --strict` and confirm `"Change is valid"`.
-- [ ] 6.4 Run `openspec archive user-creation-confirmation-frontend-link -y` to sync 2 requirements to `openspec/specs/user-creation/spec.md`. Expect `+ 2 added`.
+- [x] 6.3 Run `openspec validate user-creation-confirmation-frontend-link --strict` and confirm `"Change is valid"`.
+- [x] 6.4 Run `openspec archive user-creation-confirmation-frontend-link -y` to sync 2 requirements to `openspec/specs/user-creation/spec.md`. Expect `+ 2 added`.
 
 ## 7. Final validation
 
 - [x] 7.1 `dotnet build app-base-net-react.slnx --nologo` → 0 errors.
 - [x] 7.2 `dotnet test app-base-net-react.slnx --nologo` → 103/103 pass.
 - [x] 7.3 `cd src/frontend && npm run build` → `built in` clean.
-- [ ] 7.4 Commit atomically in 2 commits: one for backend (`fix(users): use configured frontend URL for confirmation link`), one for frontend (`feat(frontend): add /confirm-email page`).
+- [x] 7.4 Commit atomically in 2 commits: one for backend (`fix(users): use configured frontend URL for confirmation link`), one for frontend (`feat(frontend): add /confirm-email page`).

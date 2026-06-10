@@ -77,16 +77,16 @@
 
 ## 10. OpenSpec — validate + archive
 
-- [ ] 10.1 `openspec validate secure-user-onboarding --strict` → "valid".
-- [ ] 10.2 `openspec archive secure-user-onboarding -y` → `+ 4 added` to `user-creation` and `+ 1 added` to `auth-login`.
+- [x] 10.1 `openspec validate secure-user-onboarding --strict` → "valid".
+- [x] 10.2 `openspec archive secure-user-onboarding -y` → `+ 4 added` to `user-creation` and `+ 1 added` to `auth-login`.
 
 ## 11. Final validation
 
 - [x] 11.1 `dotnet build app-base-net-react.slnx --nologo` → 0 errors.
 - [x] 11.2 `dotnet test app-base-net-react.slnx --nologo` → all pass.
 - [x] 11.3 `cd src/frontend && npm run build` → `built in` clean.
-- [ ] 11.4 Commit atomically:
+- [x] 11.4 Commit atomically:
   - 1 commit: backend (request, controller, generator, resend command, template, audit handler, tests).
   - 1 commit: frontend (form, resend button).
   - 1 commit: OpenSpec artifacts.
-- [ ] 11.5 Update `AGENTS.md` migration table if the new Resend CQRS handler changes anything (it doesn't; the new endpoint is fully CQRS already).
+- [x] 11.5 Update `AGENTS.md` migration table if the new Resend CQRS handler changes anything (it doesn't; the new endpoint is fully CQRS already).

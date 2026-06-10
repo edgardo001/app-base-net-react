@@ -42,22 +42,22 @@
 
 ## 5. Refactor AuthController.ChangePassword + ForgotPassword + ResetPassword to use MediatR
 
-- [ ] 5.1 Replace the body of `AuthController.ChangePassword` (lines 132–173) with a MediatR sender: read `User.FindFirst("sub")` and return 401 if missing/malformed; call `Users.GetByIdAsync` and return 404 if null; build `ChangePasswordCommand(UserId, CurrentPassword, NewPassword, Ip, UA)`; call `IMediator.Send`; map `PasswordErrorCode` to `BadRequest(ApiResponse.Fail(message))` for `InvalidCurrentPassword`/`WeakPassword`, `NotFound()` for `UserNotFound`, or `Ok(ApiResponse.Ok(null, "Password changed successfully"))` on success
-- [ ] 5.2 Replace the body of `AuthController.ForgotPassword` (lines 175–203) with a MediatR sender: build `ForgotPasswordCommand(Email, Ip, UA)`; call `IMediator.Send`; always return `Ok(ApiResponse.Ok(null, "If the email exists, a password reset link has been sent."))`
-- [ ] 5.3 Replace the body of `AuthController.ResetPassword` (lines 205–236) with a MediatR sender: build `ResetPasswordCommand(Token, NewPassword, Ip, UA)`; call `IMediator.Send`; map `PasswordErrorCode` to `BadRequest(ApiResponse.Fail(message))` for `InvalidResetToken`/`ResetTokenExpired`/`WeakPassword`, or `Ok(ApiResponse.Ok(null, "Password reset successfully"))` on success
-- [ ] 5.4 Remove the `_renderer`, `_emailOptions`, and `_frontendUrl` private fields from `AuthController` ONLY if they are no longer used by the remaining `ConfirmEmail` endpoint (they are — keep them for now). Remove the `Serilog` `using` (the only `Log.Warning` call was in the change-password email fallback, now in the notification handler). Remove the private `SendEmail` helper if no other endpoint uses it (ConfirmEmail still uses it — keep it for now).
-- [ ] 5.5 Update the 9 controller tests in `AuthControllerTests.cs` to mock `IMediator.Send` for the 3 endpoints (drop the now-unused mocks for `_uow.Users`, `_uow.RefreshTokens.RevokeAllForUserAsync`, `_audit`, `_email` on those paths). Expect ~ −2 net tests as some happy paths get consolidated.
-- [ ] 5.6 Run `dotnet test app-base-net-react.slnx` — confirm `85/85` still green
-- [ ] 5.7 Run `dotnet build app-base-net-react.slnx` — confirm `0` errors and no new warnings
+- [x] 5.1 Replace the body of `AuthController.ChangePassword` (lines 132–173) with a MediatR sender: read `User.FindFirst("sub")` and return 401 if missing/malformed; call `Users.GetByIdAsync` and return 404 if null; build `ChangePasswordCommand(UserId, CurrentPassword, NewPassword, Ip, UA)`; call `IMediator.Send`; map `PasswordErrorCode` to `BadRequest(ApiResponse.Fail(message))` for `InvalidCurrentPassword`/`WeakPassword`, `NotFound()` for `UserNotFound`, or `Ok(ApiResponse.Ok(null, "Password changed successfully"))` on success
+- [x] 5.2 Replace the body of `AuthController.ForgotPassword` (lines 175–203) with a MediatR sender: build `ForgotPasswordCommand(Email, Ip, UA)`; call `IMediator.Send`; always return `Ok(ApiResponse.Ok(null, "If the email exists, a password reset link has been sent."))`
+- [x] 5.3 Replace the body of `AuthController.ResetPassword` (lines 205–236) with a MediatR sender: build `ResetPasswordCommand(Token, NewPassword, Ip, UA)`; call `IMediator.Send`; map `PasswordErrorCode` to `BadRequest(ApiResponse.Fail(message))` for `InvalidResetToken`/`ResetTokenExpired`/`WeakPassword`, or `Ok(ApiResponse.Ok(null, "Password reset successfully"))` on success
+- [x] 5.4 Remove the `_renderer`, `_emailOptions`, and `_frontendUrl` private fields from `AuthController` ONLY if they are no longer used by the remaining `ConfirmEmail` endpoint (they are — keep them for now). Remove the `Serilog` `using` (the only `Log.Warning` call was in the change-password email fallback, now in the notification handler). Remove the private `SendEmail` helper if no other endpoint uses it (ConfirmEmail still uses it — keep it for now).
+- [x] 5.5 Update the 9 controller tests in `AuthControllerTests.cs` to mock `IMediator.Send` for the 3 endpoints (drop the now-unused mocks for `_uow.Users`, `_uow.RefreshTokens.RevokeAllForUserAsync`, `_audit`, `_email` on those paths). Expect ~ −2 net tests as some happy paths get consolidated.
+- [x] 5.6 Run `dotnet test app-base-net-react.slnx` — confirm `85/85` still green
+- [x] 5.7 Run `dotnet build app-base-net-react.slnx` — confirm `0` errors and no new warnings
 
 ## 6. Documentation update
 
-- [ ] 6.1 Update `AGENTS.md` "¿Dónde ocurre la acción?" table — replace the "ChangePassword/ForgotPassword/ResetPassword/ConfirmEmail" row with: "ChangePassword + ForgotPassword + ResetPassword" → 🎯 (CQRS, migrated in this change), and a new "ConfirmEmail" → ⚡ row (will be migrated as follow-up)
-- [ ] 6.2 Add a small note in the migrated cell: "Migrated in `openspec/changes/cqrs-auth-password/`"
+- [x] 6.1 Update `AGENTS.md` "¿Dónde ocurre la acción?" table — replace the "ChangePassword/ForgotPassword/ResetPassword/ConfirmEmail" row with: "ChangePassword + ForgotPassword + ResetPassword" → 🎯 (CQRS, migrated in this change), and a new "ConfirmEmail" → ⚡ row (will be migrated as follow-up)
+- [x] 6.2 Add a small note in the migrated cell: "Migrated in `openspec/changes/cqrs-auth-password/`"
 
 ## 7. Final validation
 
-- [ ] 7.1 `dotnet test app-base-net-react.slnx` → `85/85` green
-- [ ] 7.2 `dotnet build app-base-net-react.slnx` → success, no new warnings
-- [ ] 7.3 `openspec validate cqrs-auth-password --strict` → passes
-- [ ] 7.4 No DB migration needed; no config changes; no docker compose changes
+- [x] 7.1 `dotnet test app-base-net-react.slnx` → `85/85` green
+- [x] 7.2 `dotnet build app-base-net-react.slnx` → success, no new warnings
+- [x] 7.3 `openspec validate cqrs-auth-password --strict` → passes
+- [x] 7.4 No DB migration needed; no config changes; no docker compose changes
