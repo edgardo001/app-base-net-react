@@ -174,10 +174,11 @@ graph LR
 | **Orquestación de negocio (ConfirmEmail)** | ✅ `Application/Features/Auth/Commands/ConfirmEmail/ConfirmEmailCommandHandler.cs` — migrado en `openspec/changes/cqrs-auth-confirm-email/` | Mismo lugar ✅ |
 | **Orquestación de negocio (CreateUser — token + email confirmation)** | ✅ `Application/Features/Users/Commands/CreateUser/CreateUserCommandHandler.cs` — migrado en `openspec/changes/cqrs-users-management/`. Spec: `openspec/specs/user-creation/spec.md` (12 requirements: 5 de email-confirmation, 2 de frontend-link, 3 de secure-onboarding, 2 de no-delete + partial-unique). | Mismo lugar ✅ |
 | **Orquestación de negocio (ResendOnboardingEmail)** | ✅ `Application/Features/Users/Commands/ResendOnboardingEmail/ResendOnboardingEmailCommandHandler.cs` (regenera token, publica `OnboardingEmailResentNotification`, fuerza reenvío solo si el usuario aún no confirmó) — implementado en `openspec/changes/2026-06-06-secure-user-onboarding/`. Endpoint: `POST /api/users/{id}/resend-onboarding-email` con mapping 200/404/409. | Mismo lugar ✅ |
-| **Validación de input** | `Application/Common/Validators/AuthValidators.cs` | Mismo lugar ✅ |
+| **Orquestación de negocio (Roles CRUD)** | ✅ `Application/Features/Roles/Commands/{CreateRole,UpdateRole,DeleteRole,UpdatePermissions}CommandHandler.cs` + `Application/Features/Roles/Queries/{GetRoles,GetRole,GetUsersByRole}QueryHandler.cs` — migrado en `openspec/changes/2026-06-03-user-role-management/` + `openspec/changes/2026-06-09-fase3-backend-completion/`. | Mismo lugar ✅ |
+| **Validación de input** | `Application/Common/Validators/{AuthValidators,RoleValidators,UserValidators}.cs` | Mismo lugar ✅ |
 | **Lógica de dominio** | `Domain/Entities/User.cs` — `MarkLogin()`, `LockUntil()`, etc. | Mismo lugar ✅ (invocado desde el handler) |
 | **Persistencia** | `Infrastructure/Persistence/Repositories/` + `UnitOfWork` | Mismo lugar ✅ |
-| **Pipeline de validación** | ✅ `Application/Common/Behaviors/ValidationBehavior.cs` — activo para Auth y Users | Mismo lugar ✅ |
+| **Pipeline de validación** | ✅ `Application/Common/Behaviors/ValidationBehavior.cs` — activo para Auth, Users y Roles | Mismo lugar ✅ |
 | **DTOs/Response** | ✅ Definidos en cada feature (`LoginResponse.cs`, `GetUsersResponse.cs`, `CreateUserResponse.cs`, etc.) | Mismo lugar ✅ |
 
 ### Reglas Arquitectónicas
