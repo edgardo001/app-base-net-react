@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound, ArrowUpDown, ArrowUp, ArrowDown, Camera } from 'lucide-react'
+import { Plus, Pencil, Search, ChevronLeft, ChevronRight, RefreshCw, Ban, CheckCircle, Send, KeyRound, ArrowUpDown, ArrowUp, ArrowDown, Camera, Download, Upload, Loader2, FileText, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AvatarUpload } from '@/components/ui/avatar-upload'
 
@@ -56,6 +56,10 @@ export function UsersPage() {
   const [resetFeedback, setResetFeedback] = useState<{ id: string; type: 'ok' | 'err'; msg: string } | null>(null)
   const [error, setError] = useState('')
   const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ created: number; errors: Array<{ rowNumber: number; message: string }> } | null>(null)
   const pageSize = 10
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UserForm>({
@@ -172,6 +176,33 @@ export function UsersPage() {
     })
   }
 
+  const handleExport = async () => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (sortBy) params.set('sortBy', sortBy)
+    params.set('sortDesc', String(sortDesc))
+    window.open(`/api/users/export?${params.toString()}`, '_blank')
+  }
+
+  const handleImport = async () => {
+    if (!importFile) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', importFile)
+      const { data } = await api.post('/users/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      setImportResult({ created: data.data.createdCount, errors: data.data.errorRows || [] })
+      fetchUsers()
+    } catch (err: unknown) {
+      setImportResult({ created: 0, errors: [{ rowNumber: 0, message: getErrorMessage(err, 'Error al importar') }] })
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const handleSort = (column: string) => {
     if (sortBy === column) {
       setSortDesc(!sortDesc)
@@ -192,7 +223,11 @@ export function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Usuarios</h1>
-        <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Nuevo</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Exportar</Button>
+          <Button variant="outline" onClick={() => { setImportFile(null); setImportResult(null); setShowImportModal(true) }}><Upload className="mr-2 h-4 w-4" /> Importar</Button>
+          <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Nuevo</Button>
+        </div>
       </div>
 
       <Card>
@@ -406,6 +441,77 @@ export function UsersPage() {
                   <Button type="submit">{editingId ? 'Guardar' : 'Crear'}</Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Importar Usuarios</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setShowImportModal(false)}><X className="h-4 w-4" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {importResult ? (
+                <div className="space-y-3">
+                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                    {importResult.created} usuario(s) creado(s)
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-sm font-medium text-red-600">Errores ({importResult.errors.length}):</p>
+                      <div className="max-h-40 space-y-1 overflow-y-auto">
+                        {importResult.errors.map((e, i) => (
+                          <p key={i} className="text-xs text-red-500">
+                            {e.rowNumber > 0 ? `Fila ${e.rowNumber}: ` : ''}{e.message}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <Button className="w-full" onClick={() => setShowImportModal(false)}>Cerrar</Button>
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed p-8 text-center hover:bg-muted/50"
+                    onClick={() => document.getElementById('csv-input')?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const file = e.dataTransfer.files[0]
+                      if (file) setImportFile(file)
+                    }}
+                  >
+                    {importFile ? (
+                      <>
+                        <FileText className="h-8 w-8 text-primary" />
+                        <p className="text-sm font-medium">{importFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(importFile.size / 1024).toFixed(1)} KB</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Arrastra un archivo CSV aquí o haz clic para seleccionar</p>
+                        <p className="text-xs text-muted-foreground">Formato: Email, FirstName, LastName (máx 10MB)</p>
+                      </>
+                    )}
+                    <input
+                      id="csv-input"
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) setImportFile(f) }}
+                    />
+                  </div>
+                  <Button className="w-full" onClick={handleImport} disabled={!importFile || importing}>
+                    {importing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importando...</> : <>Importar</>}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

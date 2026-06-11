@@ -14,6 +14,8 @@ using AppBaseNetReact.Application.Features.Users.Commands.ToggleActive;
 using AppBaseNetReact.Application.Features.Users.Commands.UpdateUser;
 using AppBaseNetReact.Application.Features.Users.Commands.UploadAvatar;
 using AppBaseNetReact.Application.Features.Users.Commands.ResendOnboardingEmail;
+using AppBaseNetReact.Application.Features.Users.Commands.ImportUsers;
+using AppBaseNetReact.Application.Features.Users.Queries.ExportUsers;
 using AppBaseNetReact.Application.Features.Users.Queries.GetAvatar;
 using AppBaseNetReact.Application.Features.Users.Queries.GetUser;
 using AppBaseNetReact.Application.Features.Users.Queries.GetUsers;
@@ -365,5 +367,87 @@ public class UsersControllerTests
         var result = await _controller.GetAvatar(Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task ExportUsers_ReturnsCsvFile()
+    {
+        var csvData = "Email,FirstName,LastName\r\na@test.com,John,Doe\r\n"u8.ToArray();
+        _mediator.Setup(x => x.Send(It.IsAny<ExportUsersQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(csvData);
+
+        var result = await _controller.ExportUsers(ct: CancellationToken.None);
+
+        var file = result.Should().BeOfType<FileContentResult>().Subject;
+        file.ContentType.Should().Be("text/csv");
+        file.FileDownloadName.Should().Be("usuarios-export.csv");
+        file.FileContents.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExportUsers_PassesSearchFilter()
+    {
+        var csvData = Array.Empty<byte>();
+        _mediator.Setup(x => x.Send(It.IsAny<ExportUsersQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(csvData);
+
+        await _controller.ExportUsers(search: "john", sortBy: "email", sortDesc: true, ct: CancellationToken.None);
+
+        _mediator.Verify(x => x.Send(
+            It.Is<ExportUsersQuery>(q => q.Search == "john" && q.SortBy == "email" && q.SortDesc),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ImportUsers_WithValidCsv_ReturnsOkWithResult()
+    {
+        var csvContent = "Email,FirstName,LastName\r\nnew@test.com,John,Doe\r\n"u8.ToArray();
+        var stream = new MemoryStream(csvContent);
+        var file = new FormFile(stream, 0, csvContent.Length, "file", "users.csv");
+
+        _mediator.Setup(x => x.Send(It.IsAny<ImportUsersCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImportUsersResult(1, []));
+
+        var result = await _controller.ImportUsers(file, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<ImportUsersResult>>().Subject;
+        response.Success.Should().BeTrue();
+        response.Data!.CreatedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ImportUsers_WithNoFile_Returns400()
+    {
+        var result = await _controller.ImportUsers(null!, CancellationToken.None);
+
+        var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var response = badRequest.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Success.Should().BeFalse();
+        response.Message.Should().Contain("No file");
+    }
+
+    [Fact]
+    public async Task ImportUsers_WithNonCsvExtension_Returns400()
+    {
+        var stream = new MemoryStream("data"u8.ToArray());
+        var file = new FormFile(stream, 0, 4, "file", "users.txt");
+
+        var result = await _controller.ImportUsers(file, CancellationToken.None);
+
+        var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        var response = badRequest.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Message.Should().Contain("CSV");
+    }
+
+    [Fact]
+    public async Task ImportUsers_WithEmptyFile_Returns400()
+    {
+        var stream = new MemoryStream([]);
+        var file = new FormFile(stream, 0, 0, "file", "users.csv");
+
+        var result = await _controller.ImportUsers(file, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 }

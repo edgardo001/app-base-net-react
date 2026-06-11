@@ -10,6 +10,8 @@ using AppBaseNetReact.Application.Features.Users.Commands.RevokeTokens;
 using AppBaseNetReact.Application.Features.Users.Commands.ToggleActive;
 using AppBaseNetReact.Application.Features.Users.Commands.UpdateUser;
 using AppBaseNetReact.Application.Features.Users.Commands.UploadAvatar;
+using AppBaseNetReact.Application.Features.Users.Commands.ImportUsers;
+using AppBaseNetReact.Application.Features.Users.Queries.ExportUsers;
 using AppBaseNetReact.Application.Features.Users.Queries.GetAvatar;
 using AppBaseNetReact.Application.Features.Users.Queries.GetUser;
 using AppBaseNetReact.Application.Features.Users.Queries.GetUsers;
@@ -247,6 +249,38 @@ public class UsersController : ControllerBase
             "FileNotFound" => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!)),
             _ => NotFound(ApiResponse<object>.Fail(outcome.Result.ErrorMessage!))
         };
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportUsers(
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDesc = false,
+        CancellationToken ct = default)
+    {
+        var csv = await _mediator.Send(
+            new ExportUsersQuery(search, sortBy, sortDesc), ct);
+        return File(csv, "text/csv", "usuarios-export.csv");
+    }
+
+    [HttpPost("import")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> ImportUsers(IFormFile file, CancellationToken ct)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("No file uploaded"));
+
+        if (!file.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse<object>.Fail("Only CSV files are accepted"));
+
+        using var stream = file.OpenReadStream();
+        var result = await _mediator.Send(new ImportUsersCommand(
+            stream,
+            file.FileName,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), ct);
+
+        return Ok(ApiResponse<ImportUsersResult>.Ok(result));
     }
 }
 
