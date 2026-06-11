@@ -73,19 +73,19 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__PostgreSQL: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mvp-usuarios-db};Username=${POSTGRES_USER:-mvp-usuarios-db};Password=${POSTGRES_PASSWORD:?}"
-      Jwt__SecretKey: ${JWT_SECRET_KEY:?Debe definir JWT_SECRET_KEY en .env}
-      Jwt__Issuer: ${JWT_ISSUER:-mvp-usuarios}
-      Jwt__Audience: ${JWT_AUDIENCE:-mvp-usuarios-api}
-      Captcha__Provider: ${CAPTCHA_PROVIDER:-None}
-      Captcha__SiteKey: ${CAPTCHA_SITE_KEY:-}
-      Captcha__SecretKey: ${CAPTCHA_SECRET_KEY:-}
-      Email__Provider: ${SMTP_PROVIDER:-Smtp}
-      Email__FromName: ${SMTP_FROM_NAME:-Sistema Gestión Usuarios}
-      Email__FromEmail: ${SMTP_FROM_EMAIL:?Debe definir SMTP_FROM_EMAIL en .env}
-      Email__Smtp__Host: ${SMTP_HOST:?Debe definir SMTP_HOST en .env}
-      Email__Smtp__Port: ${SMTP_PORT:-587}
-      Email__Smtp__Username: ${SMTP_USERNAME:?Debe definir SMTP_USERNAME en .env}
-      Email__Smtp__Password: ${SMTP_PASSWORD:?Debe definir SMTP_PASSWORD en .env}
+      Jwt__SecretKey: ${Jwt__SecretKey:?Debe definir Jwt__SecretKey en .env}
+      Jwt__Issuer: ${Jwt__Issuer:-mvp-usuarios}
+      Jwt__Audience: ${Jwt__Audience:-mvp-usuarios-api}
+      Captcha__Provider: ${Captcha__Provider:-None}
+      Captcha__SiteKey: ${Captcha__SiteKey:-}
+      Captcha__SecretKey: ${Captcha__SecretKey:-}
+      Email__Provider: ${Email__Provider:-Smtp}
+      Email__FromName: ${Email__FromName:-Sistema Gestión Usuarios}
+      Email__FromEmail: ${Email__FromEmail:?Debe definir Email__FromEmail en .env}
+      Email__Smtp__Host: ${Email__Smtp__Host:?Debe definir Email__Smtp__Host en .env}
+      Email__Smtp__Port: ${Email__Smtp__Port:-587}
+      Email__Smtp__Username: ${Email__Smtp__Username:?Debe definir Email__Smtp__Username en .env}
+      Email__Smtp__Password: ${Email__Smtp__Password:?Debe definir Email__Smtp__Password en .env}
     depends_on:
       postgres:
         condition: service_healthy
