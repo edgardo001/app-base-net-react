@@ -8,6 +8,7 @@ import {
   KeyRound,
   UserCircle,
   ShieldCheck,
+  Globe,
   AArrowDown,
   Binary,
   BookType,
@@ -21,11 +22,12 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'admin:dashboard' },
   { to: '/users', label: 'Usuarios', icon: Users, requiredPermission: 'users:list' },
   { to: '/roles', label: 'Roles', icon: Shield, requiredPermission: 'roles:list' },
   { to: '/permissions', label: 'Permisos', icon: KeyRound, requiredPermission: 'permissions:list' },
   { to: '/profile', label: 'Perfil', icon: UserCircle },
+  { to: '/publico', label: 'Público', icon: Globe, requiredPermission: 'page-public:view' },
   { to: '/admin', label: 'Admin', icon: ShieldCheck, requiredPermission: 'admin:dashboard' },
   { to: '/tipo-a', label: 'Tipo A', icon: AArrowDown, requiredPermission: 'page-a:view' },
   { to: '/tipo-b', label: 'Tipo B', icon: Binary, requiredPermission: 'page-b:view' },
