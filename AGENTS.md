@@ -268,3 +268,33 @@ For each task: [DEVELOPER] implements + adds decision comments → [QA] verifies
 
 ## Decision Log
 Every significant decision must be documented with: **Context** → **Options** → **Decision** → **Rationale** → **Trade-offs** → **Date**.
+
+### Google OAuth Login — Public Role Assignment
+- **Context:** Google login users (new or existing by email) need a default role to access `/publico`. The `public` role with `page-public:view` permission was seeded once but never updated on existing databases (seeder skipped entirely if any role existed).
+- **Options:** (1) Recreate DB, (2) Migration to add missing data, (3) Idempotent seeder with individual existence checks.
+- **Decision:** Option 3 — rewrote `DatabaseSeeder` to check each permission/role/RolePermission individually instead of a blanket early-return.
+- **Rationale:** Zero data loss, works on existing + fresh databases, no manual migrations needed for future seed additions.
+- **Trade-offs:** Slightly more startup queries (per existence check) — negligible for seed data volume.
+- **Date:** 2026-06-11
+
+### Google OAuth Login — Navigation Guard (StrictMode)
+- **Context:** React StrictMode double-invokes effects in dev mode, causing `OAuthCallbackPage` to clear the hash fragment on first invocation before the second could read it, redirecting to `/login`.
+- **Decision:** Added `useRef` guard (`processed.current`) to OAuthCallbackPage effect to ensure hash is processed exactly once.
+- **Trade-offs:** Minimal — single ref allocation per mount.
+- **Date:** 2026-06-11
+
+### Google OAuth Login — Refresh Token Encoding
+- **Context:** Refresh token (standard base64) contained `+` characters that `URLSearchParams` decoded as spaces, corrupting the token. Test users got stuck at `/login` after Google auth.
+- **Decision:** Added `Uri.EscapeDataString()` to both `accessToken` and `refreshToken` in `GoogleAuthController.Callback` redirect URL.
+- **Date:** 2026-06-11
+
+### Google OAuth Login — RolePermissions Include in GetByNameAsync
+- **Context:** `GetByNameAsync("public")` did not `.Include(r => r.RolePermissions).ThenInclude(rp => rp.Permission)`, so even when the role was found, its permissions were null → empty JWT claims → no `page-public:view` → unauthorized.
+- **Decision:** Added the missing `.Include().ThenInclude()` chain to `RoleRepository.GetByNameAsync`.
+- **Date:** 2026-06-11
+
+### Dashboard Access for Non-Admin Users
+- **Context:** Non-admin Google users (with only `public` role) could access `/dashboard`, triggering 403 errors on admin API calls. Poor UX — they saw error messages instead of being redirected to their intended page.
+- **Decision:** Protected `/dashboard` route with `AuthorizedRoute requiredPermission="admin:dashboard"` with fallback to `/publico`. Dashboard nav item also requires `admin:dashboard` permission to show in sidebar.
+- **Rationale:** Clean separation — only admin users see/have access to dashboard. Non-admin users land on `/publico` where they belong.
+- **Date:** 2026-06-11
