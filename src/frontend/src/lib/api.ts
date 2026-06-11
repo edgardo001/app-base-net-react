@@ -1,5 +1,17 @@
 import axios, { type AxiosError } from 'axios'
 
+// CSRF token generado al iniciar la app: UUID aleatorio usado como token stateless.
+// El backend verifica este header en mutaciones (POST/PUT/PATCH/DELETE) como proteccion CSRF.
+// No se necesita cookie ni session: el token es un secreto compartido via JS, inaccesible para otros origenes.
+const csrfToken = crypto.randomUUID()
+
+// Endpoints de autenticacion excluidos del CSRF (no tienen sesion establecida aun).
+const csrfExcludedPaths = ['/auth/login', '/auth/forgot-password', '/auth/reset-password', '/auth/confirm-email', '/auth/refresh', '/auth/logout', '/health']
+
+function isCsrfExcluded(url: string): boolean {
+  return csrfExcludedPaths.some((path) => url.includes(path))
+}
+
 // Axios instance preconfigurada con baseURL para evitar repetir /api en cada componente.
 // En desarrollo, Vite proxy redirige /api a localhost:5011.
 // En produccion, /api apunta al mismo origen o al dominio del backend via nginx/Traefik.
@@ -28,12 +40,16 @@ function processQueue(error: unknown, token: string | null = null) {
   failedQueue = []
 }
 
-// Request interceptor: inyecta el access token JWT en cada request.
+// Request interceptor: inyecta access token JWT y CSRF token en mutaciones.
 // El token se obtiene de localStorage (no de Zustand) para evitar dependencia circular.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  const method = config.method?.toUpperCase() ?? ''
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && config.url && !isCsrfExcluded(config.url)) {
+    config.headers['X-CSRF-TOKEN'] = csrfToken
   }
   return config
 })

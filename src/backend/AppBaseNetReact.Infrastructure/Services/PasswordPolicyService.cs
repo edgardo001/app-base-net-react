@@ -6,10 +6,14 @@ namespace AppBaseNetReact.Infrastructure.Services;
 public class PasswordPolicyService : IPasswordPolicyService
 {
     private readonly PasswordPolicySettings _settings;
+    private readonly IUnitOfWork _uow;
+    private readonly IPasswordHasherService _hasher;
 
-    public PasswordPolicyService(IOptions<PasswordPolicySettings> settings)
+    public PasswordPolicyService(IOptions<PasswordPolicySettings> settings, IUnitOfWork uow, IPasswordHasherService hasher)
     {
         _settings = settings.Value;
+        _uow = uow;
+        _hasher = hasher;
     }
 
     public int RequiredLength => _settings.RequiredLength;
@@ -20,6 +24,23 @@ public class PasswordPolicyService : IPasswordPolicyService
     public int MaxFailedAccessAttempts => _settings.MaxFailedAccessAttempts;
     public int DefaultLockoutMinutes => _settings.DefaultLockoutMinutes;
     public int ExpirationDays => _settings.ExpirationDays;
+    public int PasswordHistoryCount => _settings.PasswordHistoryCount;
+
+    public async Task<bool> CheckPasswordHistoryAsync(Guid userId, string newPassword, CancellationToken ct = default)
+    {
+        if (_settings.PasswordHistoryCount <= 0) return true;
+
+        var recentHashes = await _uow.PasswordHistories
+            .GetRecentHashesAsync(userId, _settings.PasswordHistoryCount, ct);
+
+        foreach (var hash in recentHashes)
+        {
+            if (_hasher.VerifyPassword(newPassword, hash))
+                return false;
+        }
+
+        return true;
+    }
 
     public (bool Valid, string Error) Validate(string password)
     {

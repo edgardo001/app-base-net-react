@@ -1,8 +1,11 @@
 using Serilog;
 using Scalar.AspNetCore;
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using AppBaseNetReact.Application;
 using AppBaseNetReact.Infrastructure;
+using AppBaseNetReact.Infrastructure.Persistence;
 using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Middleware;
 
@@ -26,6 +29,8 @@ try
 
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
+    builder.Services.AddHealthChecks()
+        .AddDbContextCheck<AppDbContext>("database", HealthStatus.Unhealthy);
 
     builder.Services.AddCors(options =>
     {
@@ -94,26 +99,37 @@ try
 
     app.UseCors("Default");
     app.UseRateLimiter();
+    app.UseMiddleware<CsrfMiddleware>();
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
 
-    // Health check endpoint — verifica conectividad con la base de datos.
-    app.MapGet("/health", async (HttpContext context) =>
+    // Health check endpoints para liveness y readiness probes.
+    // /health/live — siempre Healthy (solo verifica que el proceso está vivo)
+    // /health/ready — ejecuta checks registrados (DB), retorna 200 si Healthy, 503 si no
+    // /health — alias de /health/live para compatibilidad
+    static Task WriteHealthResponse(HttpContext ctx, HealthReport report)
     {
-        try
-        {
-            using var scope = app.Services.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<Microsoft.EntityFrameworkCore.DbContext>();
-            await dbContext.Database.CanConnectAsync(context.RequestAborted);
-            await context.Response.WriteAsJsonAsync(new { status = "healthy", database = "connected" });
-        }
-        catch
-        {
-            context.Response.StatusCode = 503;
-            await context.Response.WriteAsJsonAsync(new { status = "unhealthy", database = "disconnected" });
-        }
+        ctx.Response.ContentType = "application/json";
+        var status = report.Status.ToString();
+        var entries = report.Entries.ToDictionary(
+            e => e.Key,
+            e => new { status = e.Value.Status.ToString(), duration = e.Value.Duration.TotalMilliseconds });
+        return ctx.Response.WriteAsJsonAsync(new { status, entries });
+    }
+
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = _ => false,
+        ResponseWriter = WriteHealthResponse
     });
+
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        ResponseWriter = WriteHealthResponse
+    });
+
+    app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
     Log.Information("User Management API starting...");
     app.Run();

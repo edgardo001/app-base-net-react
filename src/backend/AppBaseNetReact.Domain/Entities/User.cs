@@ -29,6 +29,7 @@ public sealed class User : BaseEntity
 
     public ICollection<UserRole> UserRoles { get; private set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; private set; } = [];
+    public ICollection<PasswordHistory> PasswordHistories { get; private set; } = [];
 
     private User() { }
 

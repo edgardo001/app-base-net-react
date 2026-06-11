@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Moq;
 using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Infrastructure.Services;
 
@@ -11,7 +12,9 @@ public class PasswordPolicyServiceTests
     {
         var settings = new PasswordPolicySettings();
         configure?.Invoke(settings);
-        return new PasswordPolicyService(Options.Create(settings));
+        var uowMock = new Mock<IUnitOfWork>();
+        var hasherMock = new Mock<IPasswordHasherService>();
+        return new PasswordPolicyService(Options.Create(settings), uowMock.Object, hasherMock.Object);
     }
 
     [Fact]

@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 using MediatR;
 using AppBaseNetReact.Application.Common.Interfaces;
 using AppBaseNetReact.Application.Common.Models;
-using AppBaseNetReact.Application.Features.Auth.Commands.ChangePassword;
 using AppBaseNetReact.Application.Features.Auth.Notifications;
+using AppBaseNetReact.Domain.Entities;
 
 namespace AppBaseNetReact.Application.Features.Auth.Commands.ChangePassword;
 
@@ -44,8 +44,22 @@ public sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePasswor
             return new ChangePasswordOutcome(
                 PasswordResult.Fail(PasswordErrorCode.WeakPassword, error));
 
-        user.SetPasswordHash(_hasher.HashPassword(request.NewPassword));
+        var historyValid = await _passwordPolicy.CheckPasswordHistoryAsync(user.Id, request.NewPassword, ct);
+        if (!historyValid)
+            return new ChangePasswordOutcome(
+                PasswordResult.Fail(PasswordErrorCode.WeakPassword, "Password has been used recently. Choose a different password."));
+
+        var newHash = _hasher.HashPassword(request.NewPassword);
+        user.SetPasswordHash(newHash);
         await _uow.RefreshTokens.RevokeAllForUserAsync(user.Id, user.Id, ct);
+
+        var historyEntry = PasswordHistory.Create(user.Id, newHash);
+        await _uow.PasswordHistories.AddAsync(historyEntry, ct);
+
+        var historyCount = await _uow.PasswordHistories.CountAsync(ph => ph.UserId == user.Id, ct);
+        if (historyCount > _passwordPolicy.PasswordHistoryCount)
+            await _uow.PasswordHistories.DeleteOldestForUserAsync(user.Id, ct);
+
         await _uow.SaveChangesAsync(ct);
 
         await _mediator.Publish(

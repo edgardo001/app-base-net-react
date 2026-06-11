@@ -209,3 +209,29 @@ public class LoginAttemptRepository : GenericRepository<LoginAttempt>, ILoginAtt
 {
     public LoginAttemptRepository(AppDbContext context) : base(context) { }
 }
+
+public class PasswordHistoryRepository : GenericRepository<PasswordHistory>, IPasswordHistoryRepository
+{
+    public PasswordHistoryRepository(AppDbContext context) : base(context) { }
+
+    public async Task DeleteOldestForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var oldest = await _dbSet
+            .Where(ph => ph.UserId == userId)
+            .OrderBy(ph => ph.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (oldest != null)
+            _dbSet.Remove(oldest);
+    }
+
+    public async Task<IReadOnlyList<string>> GetRecentHashesAsync(Guid userId, int count, CancellationToken ct = default)
+    {
+        return await _dbSet
+            .Where(ph => ph.UserId == userId && ph.DeletedAt == null)
+            .OrderByDescending(ph => ph.CreatedAt)
+            .Take(count)
+            .Select(ph => ph.PasswordHash)
+            .ToListAsync(ct);
+    }
+}

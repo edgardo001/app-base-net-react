@@ -11,4 +11,6 @@ public interface IPasswordPolicyService
     int MaxFailedAccessAttempts { get; }
     int DefaultLockoutMinutes { get; }
     int ExpirationDays { get; }
+    int PasswordHistoryCount { get; }
+    Task<bool> CheckPasswordHistoryAsync(Guid userId, string newPassword, CancellationToken ct = default);
 }

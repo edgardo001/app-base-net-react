@@ -37,6 +37,12 @@ public interface ILoginAttemptRepository : IRepository<LoginAttempt>
 {
 }
 
+public interface IPasswordHistoryRepository : IRepository<PasswordHistory>
+{
+    Task DeleteOldestForUserAsync(Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetRecentHashesAsync(Guid userId, int count, CancellationToken ct = default);
+}
+
 public interface IUnitOfWork
 {
     IUserRepository Users { get; }
@@ -45,5 +51,6 @@ public interface IUnitOfWork
     IRefreshTokenRepository RefreshTokens { get; }
     IAuditLogRepository AuditLogs { get; }
     ILoginAttemptRepository LoginAttempts { get; }
+    IPasswordHistoryRepository PasswordHistories { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }
