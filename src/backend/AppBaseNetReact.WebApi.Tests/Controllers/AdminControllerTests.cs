@@ -5,11 +5,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Moq;
 using AppBaseNetReact.Application.Features.Admin.Commands.RevokeAllTokens;
 using AppBaseNetReact.Application.Features.Admin.Commands.SendTestEmail;
 using AppBaseNetReact.Application.Features.Admin.Queries.GetAuditLog;
 using AppBaseNetReact.Application.Features.Admin.Queries.GetDashboard;
+using AppBaseNetReact.Application.Features.Admin.Queries.GetMetrics;
 using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Controllers;
@@ -30,18 +33,23 @@ public class AdminControllerTests
         }
     };
     private readonly AdminController _controller;
+    private readonly DefaultHttpContext _httpContext;
 
     public AdminControllerTests()
     {
+        _httpContext = new DefaultHttpContext
+        {
+            Request = { Scheme = "https", Host = new HostString("app.example.com") }
+        };
+        _httpContext.RequestServices = new ServiceCollection()
+            .AddLogging()
+            .AddHealthChecks()
+            .Services
+            .Configure<HealthCheckServiceOptions>(_ => { })
+            .BuildServiceProvider();
         _controller = new AdminController(
             _mediator.Object, _renderer, Options.Create(_emailOptions));
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                Request = { Scheme = "https", Host = new HostString("app.example.com") }
-            }
-        };
+        _controller.ControllerContext = new ControllerContext { HttpContext = _httpContext };
     }
 
     [Fact]
@@ -125,5 +133,40 @@ public class AdminControllerTests
         response.Success.Should().BeTrue();
         response.Data.Should().NotBeNull();
         response.Data!.TotalUsers.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task GetHealth_ReturnsDetailedReport()
+    {
+        var result = await _controller.GetHealth(CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetMetrics_ReturnsSystemMetrics()
+    {
+        _mediator.Setup(x => x.Send(It.IsAny<GetMetricsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GetMetricsResponse
+            {
+                UptimeSeconds = 3600,
+                MemoryBytes = 1024 * 1024 * 50,
+                GcCollectionsGen0 = 10,
+                GcCollectionsGen1 = 5,
+                GcCollectionsGen2 = 2,
+                ThreadPoolThreads = 8,
+                Timestamp = DateTime.UtcNow
+            });
+
+        var result = await _controller.GetMetrics(CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = ok.Value.Should().BeOfType<ApiResponse<GetMetricsResponse>>().Subject;
+        response.Success.Should().BeTrue();
+        response.Data!.UptimeSeconds.Should().Be(3600);
+        response.Data.MemoryBytes.Should().Be(50 * 1024 * 1024);
+        response.Data.ThreadPoolThreads.Should().Be(8);
     }
 }

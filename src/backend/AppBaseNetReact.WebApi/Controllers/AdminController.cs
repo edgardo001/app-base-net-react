@@ -2,10 +2,12 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using AppBaseNetReact.Application.Features.Admin.Commands.RevokeAllTokens;
 using AppBaseNetReact.Application.Features.Admin.Commands.SendTestEmail;
 using AppBaseNetReact.Application.Features.Admin.Queries.GetAuditLog;
 using AppBaseNetReact.Application.Features.Admin.Queries.GetDashboard;
+using AppBaseNetReact.Application.Features.Admin.Queries.GetMetrics;
 using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Services;
 using AppBaseNetReact.WebApi.Filters;
@@ -102,6 +104,33 @@ public class AdminController : ControllerBase
         }
 
         return Ok(ApiResponse<object>.Ok($"Test email sent to {request.To}"));
+    }
+
+    [HttpGet("health")]
+    public async Task<IActionResult> GetHealth(CancellationToken ct)
+    {
+        var healthService = HttpContext.RequestServices.GetRequiredService<HealthCheckService>();
+        var report = await healthService.CheckHealthAsync(ct);
+        var data = new
+        {
+            status = report.Status.ToString(),
+            totalDuration = report.TotalDuration.TotalMilliseconds,
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                duration = e.Value.Duration.TotalMilliseconds,
+                description = e.Value.Description
+            })
+        };
+        return Ok(ApiResponse<object>.Ok(data));
+    }
+
+    [HttpGet("metrics")]
+    public async Task<IActionResult> GetMetrics(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetMetricsQuery(), ct);
+        return Ok(ApiResponse<GetMetricsResponse>.Ok(result));
     }
 }
 
