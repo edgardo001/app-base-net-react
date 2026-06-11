@@ -74,6 +74,15 @@ try
                 PermitLimit = int.Parse(rateLimitConfig["GlobalApi:MaxRequests"] ?? "100"),
                 QueueLimit = int.Parse(rateLimitConfig["GlobalApi:QueueLimit"] ?? "2")
             }));
+
+        options.AddPolicy("Google", ctx => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.Parse(rateLimitConfig["Google:Window"] ?? "00:01:00"),
+                PermitLimit = int.Parse(rateLimitConfig["Google:MaxRequests"] ?? "10"),
+                QueueLimit = int.Parse(rateLimitConfig["Google:QueueLimit"] ?? "0")
+            }));
     });
 
     // Pipeline order (el orden importa):
