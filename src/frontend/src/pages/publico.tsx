@@ -1,11 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/auth-store'
+import { MotoJuego } from '@/components/game/moto-juego'
 
 export function PublicoPage() {
   const user = useAuthStore((s) => s.user)
 
   return (
-    <div className="flex flex-1 items-center justify-center p-8">
+    <div className="flex flex-1 flex-col items-center gap-8 p-8">
       <Card className="max-w-xl text-center">
         <CardHeader>
           <CardTitle className="text-3xl">¡Bienvenido{user ? `, ${user.firstName}` : ''}!</CardTitle>
@@ -21,6 +22,11 @@ export function PublicoPage() {
           </p>
         </CardContent>
       </Card>
+
+      <div className="w-full max-w-[800px] space-y-2">
+        <h2 className="text-xl font-semibold text-center">Minijuego: Moto Mountain</h2>
+        <MotoJuego />
+      </div>
     </div>
   )
 }
