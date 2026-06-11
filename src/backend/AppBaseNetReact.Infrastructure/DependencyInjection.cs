@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
+using System.Threading.Channels;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +50,12 @@ public static class DependencyInjection
         services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
         services.AddSingleton<IRandomPasswordGenerator, RandomPasswordGenerator>();
         services.AddSingleton<EmailRenderer>();
+        services.AddSingleton(_ => Channel.CreateUnbounded<EmailMessage>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        }));
+        services.AddHostedService<EmailBackgroundService>();
         services.AddSingleton<EmailQueueService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IEmailJob, EmailJob>();

@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MailKit.Net.Smtp;
@@ -12,18 +13,33 @@ public class EmailService : IEmailService
     private readonly EmailOptions _options;
     private readonly EmailRenderer _renderer;
     private readonly ILogger<EmailService> _logger;
+    private readonly Channel<EmailMessage> _channel;
 
     public EmailService(
         IOptions<EmailOptions> options,
         EmailRenderer renderer,
-        ILogger<EmailService> logger)
+        ILogger<EmailService> logger,
+        Channel<EmailMessage> channel)
     {
         _options = options.Value;
         _renderer = renderer;
         _logger = logger;
+        _channel = channel;
     }
 
     public async Task SendEmailAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
+    {
+        if (_options.QueueEnabled)
+        {
+            await _channel.Writer.WriteAsync(new EmailMessage(to, subject, htmlBody), ct);
+            _logger.LogDebug("Email queued for {To}: {Subject}", to, subject);
+            return;
+        }
+
+        await SendNowAsync(to, subject, htmlBody, ct);
+    }
+
+    public async Task SendNowAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
     {
         if (_options.Provider == "None")
         {
