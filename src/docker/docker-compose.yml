@@ -89,6 +89,7 @@ services:
       Authentication__Google__ClientId: ${Authentication__Google__ClientId:?Debe definir Authentication__Google__ClientId en .env}
       Authentication__Google__ClientSecret: ${Authentication__Google__ClientSecret:?Debe definir Authentication__Google__ClientSecret en .env}
       Authentication__Google__RedirectUri: ${Authentication__Google__RedirectUri:?Debe definir Authentication__Google__RedirectUri en .env}
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:?Debe definir FRONTEND_DOMAIN en .env}
     depends_on:
       postgres:
         condition: service_healthy

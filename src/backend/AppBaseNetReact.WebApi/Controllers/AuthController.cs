@@ -28,7 +28,9 @@ public class AuthController : ControllerBase
     public AuthController(IMediator mediator, IConfiguration configuration, IOptions<EmailOptions> emailOptions)
     {
         _mediator = mediator;
-        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
+        _frontendUrl = configuration["FRONTEND_DOMAIN"] is { Length: > 0 } domain
+            ? "https://" + domain
+            : "http://localhost:5173";
         _emailOptions = emailOptions.Value;
     }
 

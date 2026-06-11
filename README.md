@@ -245,7 +245,7 @@ Ver [`AGENTS.md`](./AGENTS.md) para guías de workflow multi-agente.
 | `Email__Smtp__Password` | Contraseña o app password SMTP | Sí |
 | `Email__FromEmail` | Dirección remitente | Sí |
 | `Email__FromName` | Nombre remitente (default: `Sistema Gestión Usuarios`) | No |
-| `FrontendUrl` | URL del frontend para enlaces en correos (ej: `http://localhost:5173`) | Sí |
+| `FRONTEND_DOMAIN` | Dominio del frontend para enlaces en correos y redirect OAuth (ej: `app.example.com`). En desarrollo se usa `localhost:5173` | No |
 
 ## Comandos principales
 
@@ -446,6 +446,7 @@ Al publicar la aplicación en un servidor, es necesario verificar el dominio y a
      Authentication__Google__ClientId: ${Authentication__Google__ClientId:?}
      Authentication__Google__ClientSecret: ${Authentication__Google__ClientSecret:?}
      Authentication__Google__RedirectUri: ${Authentication__Google__RedirectUri:?}
+     FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:?Debe definir FRONTEND_DOMAIN en .env}
    ```
 
 ### Solución de problemas
@@ -460,3 +461,4 @@ Al publicar la aplicación en un servidor, es necesario verificar el dominio y a
 | "El sitio web no está registrado a tu nombre" | Dominio no verificado en Google Search Console | Verificar el dominio en [Search Console](https://search.google.com/search-console) |
 | Error 403 después del callback | CORS: frontend no autorizado | Agregar el dominio del frontend en `Authorized JavaScript origins` y en `Cors:AllowedOrigins` |
 | Las variables Google no se cargan en Docker | `docker-compose.yml` no pasa las env vars | Agregar `Authentication__Google__*` al `environment` del servicio `backend` |
+| Google redirige a `localhost:5173` tras autorizar | `FRONTEND_DOMAIN` no se pasa al contenedor backend | Agregar `FRONTEND_DOMAIN` al `environment` del servicio `backend` en `docker-compose.yml` |

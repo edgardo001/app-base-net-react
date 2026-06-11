@@ -23,7 +23,9 @@ public class GoogleAuthController : ControllerBase
     {
         _googleAuth = googleAuth;
         _mediator = mediator;
-        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
+        _frontendUrl = configuration["FRONTEND_DOMAIN"] is { Length: > 0 } domain
+            ? "https://" + domain
+            : "http://localhost:5173";
         _logger = logger;
     }
 
