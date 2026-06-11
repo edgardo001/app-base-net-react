@@ -39,8 +39,11 @@ export function PermissionsPage() {
         api.get('/permissions/modules'),
         api.get('/roles'),
       ])
-      setModules(modRes.data.data || [])
-      setRoles(rolesRes.data.data?.items || rolesRes.data.data || [])
+      const modulesData = modRes.data?.data?.modules || modRes.data?.data
+      setModules(Array.isArray(modulesData) ? modulesData : [])
+      setRoles(Array.isArray(rolesRes.data?.data?.items)
+        ? rolesRes.data.data.items
+        : (Array.isArray(rolesRes.data?.data) ? rolesRes.data.data : []))
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Error al cargar permisos'))
     }

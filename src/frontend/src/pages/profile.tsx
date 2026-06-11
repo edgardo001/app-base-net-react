@@ -56,17 +56,18 @@ export function ProfilePage() {
     resolver: zodResolver(passwordSchema),
   })
 
-  useEffect(() => {
-    const fetchActivity = async () => {
-      try {
-        const { data } = await api.get('/profile/activity')
-        setActivities(data.data || [])
-      } catch (err: unknown) {
-        setActivityError(getErrorMessage(err, 'Error al cargar actividad'))
+    useEffect(() => {
+      const fetchActivity = async () => {
+        try {
+          const { data } = await api.get('/profile/activity')
+          const activitiesData = data.data?.items || data.data
+          setActivities(Array.isArray(activitiesData) ? activitiesData : [])
+        } catch (err: unknown) {
+          setActivityError(getErrorMessage(err, 'Error al cargar actividad'))
+        }
       }
-    }
-    fetchActivity()
-  }, [])
+      fetchActivity()
+    }, [])
 
   const updateProfile = async (form: ProfileForm) => {
     setProfileMsg('')

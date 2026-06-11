@@ -56,7 +56,8 @@ export function RolesPage() {
   const fetchPermissions = async () => {
     try {
       const { data } = await api.get('/permissions/modules')
-      setPermissions(data.data || [])
+      const modulesData = data.data?.modules || data.data
+      setPermissions(Array.isArray(modulesData) ? modulesData : [])
     } catch { /* permissions are secondary — ignore */ }
   }
 
