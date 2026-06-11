@@ -368,10 +368,12 @@ La plataforma soporta login con Google OAuth2 (Authorization Code Flow). Los usu
    - Haz clic en "+ Create Credentials" → "OAuth client ID"
    - **Application type**: "Web application"
    - **Name**: "MVP-Usuarios-WebApp"
-   - **Authorized JavaScript origins**: deja vacío (no usamos frontend JS OAuth, usamos server-side flow)
-   - **Authorized redirect URIs**: agrega:
-     - `http://localhost:5011/api/auth/google/callback`
-     - (Para producción, agrega la URL real de tu backend, ej: `https://api.tudominio.com/api/auth/google/callback`)
+   - **Authorized JavaScript origins**:
+     - `http://localhost:5173` (desarrollo)
+     - `https://front.example.com` (producción — ejemplo)
+   - **Authorized redirect URIs**:
+     - `http://localhost:5011/api/auth/google/callback` (desarrollo)
+     - `https://back.example.com/api/auth/google/callback` (producción — ejemplo)
    - Haz clic en "Create"
 
 5. **Copiar credenciales**
@@ -413,6 +415,39 @@ Authentication__Google__RedirectUri=http://localhost:5011/api/auth/google/callba
 - Los usuarios creados por Google OAuth no tienen contraseña (no pueden usar el login por email/password)
 - El campo `RegistrationSource` queda marcado como `"google"` en la base de datos para trazabilidad
 
+### Despliegue en producción
+
+Al publicar la aplicación en un servidor, es necesario verificar el dominio y actualizar las URLs:
+
+1. **Verificar el dominio en Google Search Console**
+   - Ve a [https://search.google.com/search-console](https://search.google.com/search-console)
+   - Agrega tu dominio como propiedad (ej. `https://example.com`)
+   - Sigue el método de verificación que prefieras (TXT record en DNS, archivo HTML, etc.)
+   - Repite para cada subdominio que uses (ej. `https://front.example.com`, `https://back.example.com`)
+
+2. **Actualizar Google Cloud Console**
+   - En **OAuth consent screen**: cambia la **Homepage URL** a tu dominio de frontend (`https://front.example.com`)
+   - En **Credentials** → tu OAuth Client ID:
+     - Agrega `https://front.example.com` en **Authorized JavaScript origins**
+     - Agrega `https://back.example.com/api/auth/google/callback` en **Authorized redirect URIs**
+
+3. **Configurar variables de entorno en producción**
+
+   En tu `.env` (o en el entorno del servidor):
+   ```env
+   Authentication__Google__ClientId=tu-client-id.apps.googleusercontent.com
+   Authentication__Google__ClientSecret=tu-client-secret
+   Authentication__Google__RedirectUri=https://back.example.com/api/auth/google/callback
+   ```
+
+4. **Docker Compose** — Asegúrate de que estas variables se pasen al contenedor backend (ver `src/docker/docker-compose.yml`):
+   ```yaml
+   environment:
+     Authentication__Google__ClientId: ${Authentication__Google__ClientId:?}
+     Authentication__Google__ClientSecret: ${Authentication__Google__ClientSecret:?}
+     Authentication__Google__RedirectUri: ${Authentication__Google__RedirectUri:?}
+   ```
+
 ### Solución de problemas
 
 | Problema | Causa posible | Solución |
@@ -421,3 +456,7 @@ Authentication__Google__RedirectUri=http://localhost:5011/api/auth/google/callba
 | "Error: Google authentication failed" | Client ID/Secret incorrectos | Verificar las credenciales en `.env` |
 | "Error: access_denied" | Usuario no agregado a Test users | Ir a OAuth consent screen y agregar el email |
 | 400 Bad Request en callback | Redirect URI no coincide | Verificar que coincida exactamente la URL en Google Console y en la configuración |
+| `invalid_request` / `flowName=GeneralOAuthFlow` | Redirect URI de producción no registrado en Google Console | Agregar `https://back.example.com/api/auth/google/callback` en Credentials → Authorized redirect URIs |
+| "El sitio web no está registrado a tu nombre" | Dominio no verificado en Google Search Console | Verificar el dominio en [Search Console](https://search.google.com/search-console) |
+| Error 403 después del callback | CORS: frontend no autorizado | Agregar el dominio del frontend en `Authorized JavaScript origins` y en `Cors:AllowedOrigins` |
+| Las variables Google no se cargan en Docker | `docker-compose.yml` no pasa las env vars | Agregar `Authentication__Google__*` al `environment` del servicio `backend` |

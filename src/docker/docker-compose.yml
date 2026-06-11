@@ -86,6 +86,9 @@ services:
       Email__Smtp__Port: ${Email__Smtp__Port:-587}
       Email__Smtp__Username: ${Email__Smtp__Username:?Debe definir Email__Smtp__Username en .env}
       Email__Smtp__Password: ${Email__Smtp__Password:?Debe definir Email__Smtp__Password en .env}
+      Authentication__Google__ClientId: ${Authentication__Google__ClientId:?Debe definir Authentication__Google__ClientId en .env}
+      Authentication__Google__ClientSecret: ${Authentication__Google__ClientSecret:?Debe definir Authentication__Google__ClientSecret en .env}
+      Authentication__Google__RedirectUri: ${Authentication__Google__RedirectUri:?Debe definir Authentication__Google__RedirectUri en .env}
     depends_on:
       postgres:
         condition: service_healthy
