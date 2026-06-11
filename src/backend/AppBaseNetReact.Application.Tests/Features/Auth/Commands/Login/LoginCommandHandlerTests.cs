@@ -181,6 +181,24 @@ public class LoginCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WithPasswordlessUser_ReturnsInvalidCredentialsWithoutVerifyingPassword()
+    {
+        var user = User.Create("pwdless@test.com", "No", "Password", null, Guid.NewGuid());
+        user.ConfirmEmail();
+        _uow.Setup(x => x.Users.GetByEmailAsync(user.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var outcome = await _handler.Handle(
+            new LoginCommand(user.Email, "any-password", "127.0.0.1", "ua", null, null),
+            CancellationToken.None);
+
+        outcome.Result.ErrorCode.Should().Be(LoginErrorCode.InvalidCredentials);
+        outcome.Result.ErrorMessage.Should().Be("Invalid email or password");
+        outcome.Response.Should().BeNull();
+        _hasher.Verify(x => x.VerifyPassword(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_ReturnsPasswordExpiredFlag_WhenPasswordExpired()
     {
         var user = CreateActiveConfirmedUser();
