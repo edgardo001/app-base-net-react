@@ -270,6 +270,23 @@ docker compose -f src/docker/docker-compose.yml --env-file .env down   # Detener
 docker compose -f src/docker/docker-compose.yml --env-file .env down --volumes  # Detener + borrar volúmenes y redes (BD incluida)
 ```
 
+## Sincronización de Historial (en caso de Git Force Push)
+
+Si el historial del repositorio ha sido reescrito (por ejemplo, al purgar archivos sensibles con un `git push --force`), las máquinas con clones locales existentes no deben usar `git pull` directamente para evitar duplicar commits y generar conflictos masivos.
+
+Para sincronizar de forma segura en otra máquina manteniendo intactos tus archivos locales no trackeados (como tu archivo `.env`):
+
+```bash
+# 1. Descargar la última información del servidor remoto
+git fetch origin
+
+# 2. Alinear la rama local exactamente con la versión remota
+git reset --hard origin/main
+```
+
+> [!IMPORTANT]
+> El comando `git reset --hard` descarta cualquier cambio local no confirmado en archivos controlados por Git. Si tienes cambios de código que no quieres perder, guárdalos en un stash (`git stash`) antes de ejecutar el reset. Los archivos no trackeados e ignorados (como el archivo `.env`) **no se perderán ni se sobrescribirán**.
+
 ## Despliegue
 
 El archivo `src/docker/docker-compose.yml` levanta:
