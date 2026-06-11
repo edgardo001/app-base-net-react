@@ -51,7 +51,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginOut
         var ua = request.UserAgent ?? "unknown";
         var user = await _uow.Users.GetByEmailAsync(request.Email, ct);
 
-        if (user == null || !_hasher.VerifyPassword(request.Password, user.PasswordHash))
+        if (user == null || user.PasswordHash == null || !_hasher.VerifyPassword(request.Password, user.PasswordHash))
         {
             if (user != null)
             {

@@ -43,6 +43,11 @@ public interface IPasswordHistoryRepository : IRepository<PasswordHistory>
     Task<IReadOnlyList<string>> GetRecentHashesAsync(Guid userId, int count, CancellationToken ct = default);
 }
 
+public interface IExternalLoginRepository : IRepository<ExternalLogin>
+{
+    Task<ExternalLogin?> GetByProviderAsync(string provider, string providerId, CancellationToken ct = default);
+}
+
 public interface IUnitOfWork
 {
     IUserRepository Users { get; }
@@ -52,5 +57,6 @@ public interface IUnitOfWork
     IAuditLogRepository AuditLogs { get; }
     ILoginAttemptRepository LoginAttempts { get; }
     IPasswordHistoryRepository PasswordHistories { get; }
+    IExternalLoginRepository ExternalLogins { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

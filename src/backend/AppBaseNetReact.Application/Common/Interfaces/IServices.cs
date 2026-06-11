@@ -1,3 +1,5 @@
+using AppBaseNetReact.Application.Common.Models;
+
 namespace AppBaseNetReact.Application.Common.Interfaces;
 
 public interface IJwtService
@@ -37,4 +39,10 @@ public interface IDateTimeProvider
 public interface IRandomPasswordGenerator
 {
     string Generate(int length = 12);
+}
+
+public interface IGoogleAuthService
+{
+    string GetAuthorizationUrl(string state);
+    Task<GoogleUserInfo> ExchangeCodeAsync(string code, string state, CancellationToken ct = default);
 }
