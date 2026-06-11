@@ -5,10 +5,12 @@ using System.Threading.Channels;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using AppBaseNetReact.Application.Common.Interfaces;
+using AppBaseNetReact.Application.Common.Models;
 using AppBaseNetReact.Infrastructure.Email;
 using AppBaseNetReact.Infrastructure.Identity;
 using AppBaseNetReact.Infrastructure.Persistence;
@@ -29,13 +31,15 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(
                 configuration.GetConnectionString("PostgreSQL"),
-                b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
+                b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.MultipleCollectionIncludeWarning)));
 
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.Configure<PasswordPolicySettings>(configuration.GetSection("PasswordPolicy"));
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
         services.Configure<StorageOptions>(configuration.GetSection("Storage"));
         services.Configure<TurnstileOptions>(configuration.GetSection("Captcha"));
+        services.Configure<GoogleOptions>(configuration.GetSection("Authentication:Google"));
         var emailOptions = configuration.GetSection("Email").Get<EmailOptions>()
             ?? throw new InvalidOperationException("Email settings not configured");
         if (string.IsNullOrWhiteSpace(emailOptions.FrontendBaseUrl))
@@ -61,6 +65,10 @@ public static class DependencyInjection
         services.AddScoped<IEmailJob, EmailJob>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddHttpClient<ICaptchaService, TurnstileService>();
+        services.AddHttpClient<IGoogleAuthService, GoogleAuthService>(client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("AppBaseNetReact/1.0");
+        });
 
         var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()
             ?? throw new InvalidOperationException("JWT settings not configured");

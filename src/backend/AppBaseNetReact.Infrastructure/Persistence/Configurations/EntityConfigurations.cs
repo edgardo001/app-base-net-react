@@ -13,13 +13,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.Email).HasMaxLength(256).IsRequired();
         builder.Property(u => u.NormalizedEmail).HasMaxLength(256).IsRequired();
-        builder.Property(u => u.PasswordHash).IsRequired();
+        builder.Property(u => u.PasswordHash).IsRequired(false);
         builder.Property(u => u.SecurityStamp).HasMaxLength(64).IsRequired();
         builder.Property(u => u.FirstName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.LastName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.AvatarPath).HasMaxLength(500);
         builder.Property(u => u.EmailConfirmationToken).HasMaxLength(256);
         builder.Property(u => u.ConcurrencyToken).IsConcurrencyToken();
+        builder.Property(u => u.RegistrationSource).HasMaxLength(50);
 
         // Partial unique indexes: enforce uniqueness only among ACTIVE users
         // (DeletedAt IS NULL). Soft-deleted users do not occupy the email,
@@ -198,5 +199,29 @@ public class LoginAttemptConfiguration : IEntityTypeConfiguration<LoginAttempt>
 
         builder.HasIndex(la => la.CreatedAt).HasDatabaseName("IX_LoginAttempts_CreatedAt");
         builder.HasIndex(la => new { la.IpAddress, la.CreatedAt }).HasDatabaseName("IX_LoginAttempts_IpAddress_CreatedAt");
+    }
+}
+
+public class ExternalLoginConfiguration : IEntityTypeConfiguration<ExternalLogin>
+{
+    public void Configure(EntityTypeBuilder<ExternalLogin> builder)
+    {
+        builder.ToTable("ExternalLogins");
+        builder.HasKey(el => el.Id);
+
+        builder.Property(el => el.Provider).HasMaxLength(50).IsRequired();
+        builder.Property(el => el.ProviderId).HasMaxLength(500).IsRequired();
+        builder.Property(el => el.ProviderEmail).HasMaxLength(256).IsRequired();
+
+        builder.HasIndex(el => new { el.Provider, el.ProviderId })
+            .IsUnique()
+            .HasDatabaseName("IX_ExternalLogins_Provider_ProviderId");
+
+        builder.HasOne(el => el.User)
+            .WithMany(u => u.ExternalLogins)
+            .HasForeignKey(el => el.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasQueryFilter(el => el.User.DeletedAt == null);
     }
 }

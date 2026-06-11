@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
     public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
+    public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

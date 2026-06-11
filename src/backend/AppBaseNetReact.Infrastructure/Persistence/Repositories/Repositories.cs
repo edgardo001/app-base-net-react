@@ -146,7 +146,10 @@ public class RoleRepository : GenericRepository<Role>, IRoleRepository
     public RoleRepository(AppDbContext context) : base(context) { }
 
     public async Task<Role?> GetByNameAsync(string name, CancellationToken ct = default)
-        => await _dbSet.FirstOrDefaultAsync(r => r.NormalizedName == name.ToUpperInvariant(), ct);
+        => await _dbSet
+            .Include(r => r.RolePermissions)
+            .ThenInclude(rp => rp.Permission)
+            .FirstOrDefaultAsync(r => r.NormalizedName == name.ToUpperInvariant(), ct);
 
     public async Task<Role?> GetByIdWithPermissionsAsync(Guid id, CancellationToken ct = default)
         => await _dbSet
@@ -208,6 +211,20 @@ public class PermissionRepository : GenericRepository<Permission>, IPermissionRe
 public class LoginAttemptRepository : GenericRepository<LoginAttempt>, ILoginAttemptRepository
 {
     public LoginAttemptRepository(AppDbContext context) : base(context) { }
+}
+
+public class ExternalLoginRepository : GenericRepository<ExternalLogin>, IExternalLoginRepository
+{
+    public ExternalLoginRepository(AppDbContext context) : base(context) { }
+
+    public async Task<ExternalLogin?> GetByProviderAsync(string provider, string providerId, CancellationToken ct = default)
+        => await _dbSet
+            .Include(el => el.User)
+            .ThenInclude(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .ThenInclude(r => r.RolePermissions)
+            .ThenInclude(rp => rp.Permission)
+            .FirstOrDefaultAsync(el => el.Provider == provider && el.ProviderId == providerId, ct);
 }
 
 public class PasswordHistoryRepository : GenericRepository<PasswordHistory>, IPasswordHistoryRepository

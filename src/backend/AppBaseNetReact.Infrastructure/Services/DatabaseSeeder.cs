@@ -18,104 +18,152 @@ public static class DatabaseSeeder
 
         await context.Database.MigrateAsync();
 
-        if (await context.Roles.AnyAsync()) return;
-
-        logger.LogInformation("Seeding database...");
-
-        // Permissions
-        var permissions = new List<Permission>
+        var anySeeded = await context.Permissions.AnyAsync();
+        if (anySeeded)
         {
-            Permission.Create("users:list", "List Users", "Users", "View list of users"),
-            Permission.Create("users:create", "Create Users", "Users", "Create new users"),
-            Permission.Create("users:edit", "Edit Users", "Users", "Edit existing users"),
-            Permission.Create("users:delete", "Delete Users", "Users", "Soft delete users"),
-            Permission.Create("users:activate", "Activate/Deactivate Users", "Users", "Toggle user active status"),
-            Permission.Create("users:reset-password", "Reset User Password", "Users", "Reset another user's password"),
-            Permission.Create("users:revoke-tokens", "Revoke User Tokens", "Users", "Revoke sessions for a user"),
-            Permission.Create("roles:list", "List Roles", "Roles", "View list of roles"),
-            Permission.Create("roles:create", "Create Roles", "Roles", "Create new roles"),
-            Permission.Create("roles:edit", "Edit Roles", "Roles", "Edit existing roles"),
-            Permission.Create("roles:delete", "Delete Roles", "Roles", "Delete roles"),
-            Permission.Create("roles:assign", "Assign Permissions", "Roles", "Assign permissions to roles"),
-            Permission.Create("permissions:list", "List Permissions", "Permissions", "View permission catalog"),
-            Permission.Create("permissions:assign", "Assign Permissions", "Permissions", "Assign permissions to roles"),
-            Permission.Create("audit:view", "View Audit Log", "Audit", "View audit log entries"),
-            Permission.Create("admin:dashboard", "View Dashboard", "Admin", "View admin dashboard"),
-            Permission.Create("admin:settings", "System Settings", "Admin", "Manage system settings"),
-            Permission.Create("profile:own:view", "View Own Profile", "Profile", "View own profile"),
-            Permission.Create("profile:own:edit", "Edit Own Profile", "Profile", "Edit own profile"),
-            Permission.Create("profile:own:password", "Change Own Password", "Profile", "Change own password"),
-            Permission.Create("page-a:view", "View Page A", "Pages", "Access to page A"),
-            Permission.Create("page-b:view", "View Page B", "Pages", "Access to page B"),
-            Permission.Create("page-c:view", "View Page C", "Pages", "Access to page C"),
+            logger.LogInformation("Database already seeded, ensuring missing seed data...");
+        }
+        else
+        {
+            logger.LogInformation("Seeding database...");
+        }
+
+        var permissionDefs = new List<(string Code, string Name, string Module, string Description)>
+        {
+            ("users:list", "List Users", "Users", "View list of users"),
+            ("users:create", "Create Users", "Users", "Create new users"),
+            ("users:edit", "Edit Users", "Users", "Edit existing users"),
+            ("users:delete", "Delete Users", "Users", "Soft delete users"),
+            ("users:activate", "Activate/Deactivate Users", "Users", "Toggle user active status"),
+            ("users:reset-password", "Reset User Password", "Users", "Reset another user's password"),
+            ("users:revoke-tokens", "Revoke User Tokens", "Users", "Revoke sessions for a user"),
+            ("roles:list", "List Roles", "Roles", "View list of roles"),
+            ("roles:create", "Create Roles", "Roles", "Create new roles"),
+            ("roles:edit", "Edit Roles", "Roles", "Edit existing roles"),
+            ("roles:delete", "Delete Roles", "Roles", "Delete roles"),
+            ("roles:assign", "Assign Permissions", "Roles", "Assign permissions to roles"),
+            ("permissions:list", "List Permissions", "Permissions", "View permission catalog"),
+            ("permissions:assign", "Assign Permissions", "Permissions", "Assign permissions to roles"),
+            ("audit:view", "View Audit Log", "Audit", "View audit log entries"),
+            ("admin:dashboard", "View Dashboard", "Admin", "View admin dashboard"),
+            ("admin:settings", "System Settings", "Admin", "Manage system settings"),
+            ("profile:own:view", "View Own Profile", "Profile", "View own profile"),
+            ("profile:own:edit", "Edit Own Profile", "Profile", "Edit own profile"),
+            ("profile:own:password", "Change Own Password", "Profile", "Change own password"),
+            ("page-a:view", "View Page A", "Pages", "Access to page A"),
+            ("page-b:view", "View Page B", "Pages", "Access to page B"),
+            ("page-c:view", "View Page C", "Pages", "Access to page C"),
+            ("page-public:view", "View Public Page", "Public", "Access to public welcome page"),
         };
 
-        context.Permissions.AddRange(permissions);
+        foreach (var (code, name, module, description) in permissionDefs)
+        {
+            if (!await context.Permissions.AnyAsync(p => p.Code == code))
+            {
+                context.Permissions.Add(Permission.Create(code, name, module, description));
+            }
+        }
         await context.SaveChangesAsync();
 
-        // Roles
-        var superAdminRole = Role.Create("SuperAdmin", "Full system access", isSystem: true);
-        var adminRole = Role.Create("Admin", "Administrative access", isSystem: true);
-        var roleA = Role.Create("user-tipo-a", "Access to page A");
-        var roleB = Role.Create("user-tipo-b", "Access to page B");
-        var roleC = Role.Create("user-tipo-c", "Access to page C");
+        var roleDefs = new List<(string Name, string Description, bool IsSystem)>
+        {
+            ("SuperAdmin", "Full system access", true),
+            ("Admin", "Administrative access", true),
+            ("user-tipo-a", "Access to page A", false),
+            ("user-tipo-b", "Access to page B", false),
+            ("user-tipo-c", "Access to page C", false),
+            ("public", "Public role for OAuth users", true),
+        };
 
-        context.Roles.AddRange(superAdminRole, adminRole, roleA, roleB, roleC);
+        foreach (var (name, description, isSystem) in roleDefs)
+        {
+            if (!await context.Roles.AnyAsync(r => r.Name == name))
+            {
+                context.Roles.Add(Role.Create(name, description, isSystem));
+            }
+        }
         await context.SaveChangesAsync();
 
-        // RolePermissions - SuperAdmin gets all
-        foreach (var p in permissions)
-            context.RolePermissions.Add(RolePermission.Create(superAdminRole.Id, p.Id));
+        var superAdminRole = await context.Roles.FirstAsync(r => r.Name == "SuperAdmin");
+        var adminRole = await context.Roles.FirstAsync(r => r.Name == "Admin");
+        var roleA = await context.Roles.FirstAsync(r => r.Name == "user-tipo-a");
+        var roleB = await context.Roles.FirstAsync(r => r.Name == "user-tipo-b");
+        var roleC = await context.Roles.FirstAsync(r => r.Name == "user-tipo-c");
+        var publicRole = await context.Roles.FirstAsync(r => r.Name == "public");
+
+        var allPerms = await context.Permissions.ToListAsync();
+
+        // SuperAdmin gets all permissions
+        foreach (var p in allPerms)
+        {
+            if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == superAdminRole.Id && rp.PermissionId == p.Id))
+            {
+                context.RolePermissions.Add(RolePermission.Create(superAdminRole.Id, p.Id));
+            }
+        }
 
         // Admin gets specific permissions
-        var adminPerms = permissions.Where(p => p.Code.StartsWith("users:")
+        foreach (var p in allPerms.Where(p => p.Code.StartsWith("users:")
             || p.Code.StartsWith("roles:") || p.Code.StartsWith("permissions:")
             || p.Code.StartsWith("audit:") || p.Code.StartsWith("admin:")
-            || p.Code.StartsWith("profile:"));
-        foreach (var p in adminPerms)
-            context.RolePermissions.Add(RolePermission.Create(adminRole.Id, p.Id));
+            || p.Code.StartsWith("profile:")))
+        {
+            if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == adminRole.Id && rp.PermissionId == p.Id))
+            {
+                context.RolePermissions.Add(RolePermission.Create(adminRole.Id, p.Id));
+            }
+        }
 
-        // Role-specific permissions
-        var permA = permissions.First(p => p.Code == "page-a:view");
-        var permB = permissions.First(p => p.Code == "page-b:view");
-        var permC = permissions.First(p => p.Code == "page-c:view");
-        var profileView = permissions.First(p => p.Code == "profile:own:view");
-        var profileEdit = permissions.First(p => p.Code == "profile:own:edit");
-        var profilePwd = permissions.First(p => p.Code == "profile:own:password");
+        // Role-specific permissions (page + profile)
+        var aCodes = new[] { "page-a:view", "profile:own:view", "profile:own:edit", "profile:own:password" };
+        var bCodes = new[] { "page-b:view", "profile:own:view", "profile:own:edit", "profile:own:password" };
+        var cCodes = new[] { "page-c:view", "profile:own:view", "profile:own:edit", "profile:own:password" };
 
-        context.RolePermissions.Add(RolePermission.Create(roleA.Id, permA.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleA.Id, profileView.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleA.Id, profileEdit.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleA.Id, profilePwd.Id));
+        await EnsureRolePermissionsAsync(context, roleA.Id, aCodes);
+        await EnsureRolePermissionsAsync(context, roleB.Id, bCodes);
+        await EnsureRolePermissionsAsync(context, roleC.Id, cCodes);
 
-        context.RolePermissions.Add(RolePermission.Create(roleB.Id, permB.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleB.Id, profileView.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleB.Id, profileEdit.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleB.Id, profilePwd.Id));
-
-        context.RolePermissions.Add(RolePermission.Create(roleC.Id, permC.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleC.Id, profileView.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleC.Id, profileEdit.Id));
-        context.RolePermissions.Add(RolePermission.Create(roleC.Id, profilePwd.Id));
+        // Public role gets only page-public:view
+        await EnsureRolePermissionsAsync(context, publicRole.Id, new[] { "page-public:view" });
 
         await context.SaveChangesAsync();
 
-        // Admin user
-        var adminUser = User.Create(
-            "admin@sistema.local",
-            "Admin",
-            "Usuario",
-            hasher.HashPassword("admin"),
-            null);
+        // Admin user: always ensure exists
+        var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Email == "admin@sistema.local");
+        if (adminUser == null)
+        {
+            adminUser = User.Create(
+                "admin@sistema.local",
+                "Admin",
+                "Usuario",
+                hasher.HashPassword("admin"),
+                null);
 
-        adminUser.ConfirmEmail();
-        adminUser.ForcePasswordChange();
-        context.Users.Add(adminUser);
-        await context.SaveChangesAsync();
+            adminUser.ConfirmEmail();
+            adminUser.ForcePasswordChange();
+            context.Users.Add(adminUser);
+            await context.SaveChangesAsync();
+        }
 
-        context.UserRoles.Add(UserRole.Create(adminUser.Id, superAdminRole.Id));
-        await context.SaveChangesAsync();
+        // Ensure SuperAdmin role is assigned to admin user
+        if (!await context.UserRoles.AnyAsync(ur => ur.UserId == adminUser.Id && ur.RoleId == superAdminRole.Id))
+        {
+            context.UserRoles.Add(UserRole.Create(adminUser.Id, superAdminRole.Id));
+            await context.SaveChangesAsync();
+        }
 
         logger.LogInformation("Database seeding completed.");
+    }
+
+    private static async Task EnsureRolePermissionsAsync(AppDbContext context, Guid roleId, string[] permissionCodes)
+    {
+        var perms = await context.Permissions.Where(p => permissionCodes.Contains(p.Code)).ToListAsync();
+        foreach (var perm in perms)
+        {
+            if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == roleId && rp.PermissionId == perm.Id))
+            {
+                context.RolePermissions.Add(RolePermission.Create(roleId, perm.Id));
+            }
+        }
     }
 }

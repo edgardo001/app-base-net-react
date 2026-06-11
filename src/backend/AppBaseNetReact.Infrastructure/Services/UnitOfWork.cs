@@ -20,6 +20,7 @@ public class UnitOfWork : IUnitOfWork, IDisposable
     private IAuditLogRepository? _auditLogs;
     private ILoginAttemptRepository? _loginAttempts;
     private IPasswordHistoryRepository? _passwordHistories;
+    private IExternalLoginRepository? _externalLogins;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -33,6 +34,7 @@ public class UnitOfWork : IUnitOfWork, IDisposable
     public IAuditLogRepository AuditLogs => _auditLogs ??= new AuditLogRepository(_context);
     public ILoginAttemptRepository LoginAttempts => _loginAttempts ??= new LoginAttemptRepository(_context);
     public IPasswordHistoryRepository PasswordHistories => _passwordHistories ??= new PasswordHistoryRepository(_context);
+    public IExternalLoginRepository ExternalLogins => _externalLogins ??= new ExternalLoginRepository(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
         => await _context.SaveChangesAsync(ct);
