@@ -323,6 +323,101 @@ Para verificar: `swapon --show` o `free -h`.
 ## Seed Data
 
 Al iniciar por primera vez, el seeder crea:
-- **22 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil
-- **5 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c
+- **23 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil, página pública
+- **6 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c, public
 - **Usuario admin**: `admin` / `admin` (SuperAdmin — se exige cambiar contraseña en primer ingreso)
+
+## Google OAuth 2.0 — Configuración
+
+La plataforma soporta login con Google OAuth2 (Authorization Code Flow). Los usuarios nuevos se registran automáticamente con el rol `public` y el campo `RegistrationSource` queda marcado como `"google"` para trazabilidad.
+
+### Requisitos
+
+- Una cuenta de Google (gratuita, personal — no requiere Google Workspace)
+- Acceso a [Google Cloud Console](https://console.cloud.google.com)
+
+### Paso a paso: Crear credenciales OAuth 2.0
+
+1. **Ir a Google Cloud Console**
+   - Navega a [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
+   - Inicia sesión con tu cuenta de Google
+
+2. **Crear o seleccionar un proyecto**
+   - Si no tienes uno, haz clic en el selector de proyectos (arriba a la izquierda) y selecciona "Nuevo proyecto"
+   - Asígnale un nombre (ej. "MVP-Usuarios-OAuth")
+   - Espera a que se cree y selecciona el proyecto
+
+3. **Configurar la pantalla de consentimiento OAuth**
+   - En el menú lateral: "APIs & Services" → "OAuth consent screen"
+   - User Type: selecciona **"External"** (es la opción para cuentas personales/gratuitas)
+   - Haz clic en "Create"
+   - **App name**: "MVP Usuarios" (o el nombre que quieras)
+   - **User support email**: tu correo
+   - **Developer contact information**: tu correo
+   - Haz clic en "Save and Continue"
+   - **Scopes**: no es necesario agregar scopes adicionales (usamos `openid`, `email`, `profile` que vienen por defecto)
+   - Haz clic en "Save and Continue"
+   - **Test users**: haz clic en "ADD USERS" y agrega tu correo (mientras la app está en estado "Testing", solo los usuarios que agregues aquí podrán autenticarse)
+   - Haz clic en "Save and Continue"
+   - Revisa el resumen y haz clic en "Back to Dashboard"
+
+   > **Nota:** Como la app está en estado "Testing", no requiere verificación de Google. Es suficiente para desarrollo y aprendizaje. Cuando quieras publicarla, puedes solicitar verificación o cambiar a "Production", pero para uso personal/aprendizaje el estado "Testing" es adecuado.
+
+4. **Crear credenciales OAuth 2.0**
+   - En el menú lateral: "APIs & Services" → "Credentials"
+   - Haz clic en "+ Create Credentials" → "OAuth client ID"
+   - **Application type**: "Web application"
+   - **Name**: "MVP-Usuarios-WebApp"
+   - **Authorized JavaScript origins**: deja vacío (no usamos frontend JS OAuth, usamos server-side flow)
+   - **Authorized redirect URIs**: agrega:
+     - `http://localhost:5011/api/auth/google/callback`
+     - (Para producción, agrega la URL real de tu backend, ej: `https://api.tudominio.com/api/auth/google/callback`)
+   - Haz clic en "Create"
+
+5. **Copiar credenciales**
+   - Anota el **Client ID** y el **Client Secret** que Google te muestra
+   - Estos valores van en tu `.env` o en los secretos de la aplicación
+
+    > ⚠️ **Importante:** El Client Secret es sensible — nunca lo compartas ni lo subas al repositorio.
+
+### Configurar variables de entorno
+
+Agrega las siguientes variables a tu `.env` (o usa `dotnet user-secrets`):
+
+```bash
+dotnet user-secrets set "Authentication:Google:ClientId" "tu-client-id.apps.googleusercontent.com" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Authentication:Google:ClientSecret" "tu-client-secret" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Authentication:Google:RedirectUri" "http://localhost:5011/api/auth/google/callback" --project src/backend/AppBaseNetReact.WebApi
+```
+
+O directamente en `.env` (copiado desde `.env.template`):
+
+```env
+Authentication__Google__ClientId=tu-client-id.apps.googleusercontent.com
+Authentication__Google__ClientSecret=tu-client-secret
+Authentication__Google__RedirectUri=http://localhost:5011/api/auth/google/callback
+```
+
+### Verificar que funciona
+
+1. Inicia la aplicación (backend + frontend)
+2. Ve a `http://localhost:5173/login`
+3. Haz clic en "Continuar con Google"
+4. Serás redirigido a Google para autorizar
+5. Después de autorizar, serás redirigido de vuelta y verás el mensaje de bienvenida en `/publico`
+
+### Notas importantes
+
+- El rol `public` se asigna automáticamente solo a usuarios nuevos (primer login con Google)
+- Si un usuario ya existe con el mismo email (registrado por password), se vincula la cuenta de Google y NO se asigna el rol `public`
+- Los usuarios creados por Google OAuth no tienen contraseña (no pueden usar el login por email/password)
+- El campo `RegistrationSource` queda marcado como `"google"` en la base de datos para trazabilidad
+
+### Solución de problemas
+
+| Problema | Causa posible | Solución |
+|----------|--------------|----------|
+| "Error: Invalid state parameter" | Cookies deshabilitadas o sesión expirada | Recargar la página e intentar de nuevo |
+| "Error: Google authentication failed" | Client ID/Secret incorrectos | Verificar las credenciales en `.env` |
+| "Error: access_denied" | Usuario no agregado a Test users | Ir a OAuth consent screen y agregar el email |
+| 400 Bad Request en callback | Redirect URI no coincide | Verificar que coincida exactamente la URL en Google Console y en la configuración |
