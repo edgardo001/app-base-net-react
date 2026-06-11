@@ -11,7 +11,7 @@ public sealed class User : BaseEntity
 {
     public string Email { get; private set; } = string.Empty;
     public string NormalizedEmail { get; private set; } = string.Empty;
-    public string PasswordHash { get; private set; } = string.Empty;
+    public string? PasswordHash { get; private set; }
     public string SecurityStamp { get; private set; } = Guid.NewGuid().ToString();
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
@@ -26,14 +26,16 @@ public sealed class User : BaseEntity
     public int AccessFailedCount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
     public bool LockoutEnabled { get; private set; } = true;
+    public string? RegistrationSource { get; private set; }
 
     public ICollection<UserRole> UserRoles { get; private set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; private set; } = [];
     public ICollection<PasswordHistory> PasswordHistories { get; private set; } = [];
+    public ICollection<ExternalLogin> ExternalLogins { get; private set; } = [];
 
     private User() { }
 
-    public static User Create(string email, string firstName, string lastName, string passwordHash, Guid? createdBy = null)
+    public static User Create(string email, string firstName, string lastName, string? passwordHash, Guid? createdBy = null, string? registrationSource = null)
     {
         return new User
         {
@@ -46,7 +48,8 @@ public sealed class User : BaseEntity
             SecurityStamp = Guid.NewGuid().ToString(),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = createdBy,
-            LastPasswordChangeAt = DateTime.UtcNow
+            LastPasswordChangeAt = passwordHash != null ? DateTime.UtcNow : null,
+            RegistrationSource = registrationSource
         };
     }
 

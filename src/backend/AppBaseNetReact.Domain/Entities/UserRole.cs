@@ -9,12 +9,13 @@ public sealed class UserRole
 
     private UserRole() { }
 
-    public static UserRole Create(Guid userId, Guid roleId)
+    public static UserRole Create(Guid userId, Guid roleId, Role? role = null)
     {
         return new UserRole
         {
             UserId = userId,
-            RoleId = roleId
+            RoleId = roleId,
+            Role = role!
         };
     }
 }
