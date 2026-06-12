@@ -449,7 +449,7 @@ Al publicar la aplicación en un servidor, es necesario verificar el dominio y a
      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:?Debe definir FRONTEND_DOMAIN en .env}
    ```
 
-### Solución de problemas
+### Solución de problemas — Google
 
 | Problema | Causa posible | Solución |
 |----------|--------------|----------|
@@ -462,3 +462,91 @@ Al publicar la aplicación en un servidor, es necesario verificar el dominio y a
 | Error 403 después del callback | CORS: frontend no autorizado | Agregar el dominio del frontend en `Authorized JavaScript origins` y en `Cors:AllowedOrigins` |
 | Las variables Google no se cargan en Docker | `docker-compose.yml` no pasa las env vars | Agregar `Authentication__Google__*` al `environment` del servicio `backend` |
 | Google redirige a `localhost:5173` tras autorizar | `FRONTEND_DOMAIN` no se pasa al contenedor backend | Agregar `FRONTEND_DOMAIN` al `environment` del servicio `backend` en `docker-compose.yml` |
+
+## GitHub OAuth 2.0 — Configuración
+
+La plataforma soporta login con GitHub OAuth2 (Authorization Code Flow). Los usuarios nuevos se registran automáticamente con el rol `public` y el campo `RegistrationSource` queda marcado como `"github"` para trazabilidad.
+
+### Requisitos
+
+- Una cuenta de GitHub (gratuita, personal — no requiere GitHub Enterprise)
+- Acceso a [GitHub Settings > Developer settings](https://github.com/settings/developers)
+
+### Paso a paso: Crear OAuth App en GitHub
+
+1. **Ir a GitHub Developer Settings**
+   - Navega a [https://github.com/settings/developers](https://github.com/settings/developers)
+   - En el menú lateral: **OAuth Apps**
+   - Haz clic en **"New OAuth App"** (o **"Register a new application"**)
+
+2. **Completar el formulario de registro**
+
+   | Campo | Valor (desarrollo) | Valor (producción — ejemplo) |
+   |-------|-------------------|------------------------------|
+   | **Application name** | `AppBaseNetReact` | `AppBaseNetReact` |
+   | **Homepage URL** | `http://localhost:5173` | `https://front.example.com` |
+   | **Application description** | *(opcional)* | *(opcional)* |
+   | **Authorization callback URL** | `http://localhost:5011/api/auth/github/callback` | `https://back.example.com/api/auth/github/callback` |
+
+   > ⚠️ **La Authorization callback URL debe coincidir exactamente** con la configurada en `Authentication:GitHub:RedirectUri`. GitHub valifica esta URL estrictamente.
+
+3. **Haz clic en "Register application"**
+
+4. **Copiar credenciales**
+   - Anota el **Client ID** (visible en la página de la app)
+   - Haz clic en **"Generate a new client secret"** y copia el **Client Secret**
+
+    > ⚠️ **Importante:** El Client Secret es sensible — nunca lo compartas ni lo subas al repositorio. GitHub solo lo muestra una vez; si lo pierdes, debes generar uno nuevo.
+
+### Configurar variables de entorno
+
+Agrega las siguientes variables a tu `.env` (o usa `dotnet user-secrets`):
+
+```bash
+dotnet user-secrets set "Authentication:GitHub:ClientId" "tu-client-id" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Authentication:GitHub:ClientSecret" "tu-client-secret" --project src/backend/AppBaseNetReact.WebApi
+dotnet user-secrets set "Authentication:GitHub:RedirectUri" "http://localhost:5011/api/auth/github/callback" --project src/backend/AppBaseNetReact.WebApi
+```
+
+O directamente en `.env` (copiado desde `.env.template`):
+
+```env
+Authentication__GitHub__ClientId=tu-client-id
+Authentication__GitHub__ClientSecret=tu-client-secret
+Authentication__GitHub__RedirectUri=http://localhost:5011/api/auth/github/callback
+```
+
+### Verificar que funciona
+
+1. Inicia la aplicación (backend + frontend)
+2. Ve a `http://localhost:5173/login`
+3. Haz clic en **"Continuar con GitHub"**
+4. Serás redirigido a GitHub para autorizar (solicita permisos de `read:user` y `user:email`)
+5. Después de autorizar, serás redirigido de vuelta y verás el mensaje de bienvenida en `/publico`
+
+### Diferencias con Google OAuth
+
+| Aspecto | Google OAuth | GitHub OAuth |
+|---------|-------------|--------------|
+| **Protocolo** | OpenID Connect (ID token JWT) | OAuth2 estándar (sin OpenID) |
+| **Email** | Siempre disponible (scope `openid email`) | Puede ser privado; se solicita scope `user:email` y API adicional |
+| **Nombre** | `given_name` + `family_name` | `name` (puede ser null; fallback a `login`) |
+| **Verificación** | Google Cloud Console (estado Testing) | Sin verificación — todas las apps funcionan inmediatamente |
+
+### Notas importantes
+
+- El rol `public` se asigna automáticamente solo a usuarios nuevos (primer login con GitHub)
+- Si un usuario ya existe con el mismo email (registrado por password o Google), se vincula la cuenta de GitHub y NO se asigna el rol `public`
+- Los usuarios creados por GitHub OAuth no tienen contraseña (no pueden usar el login por email/password)
+- El campo `RegistrationSource` queda marcado como `"github"` en la base de datos para trazabilidad
+- GitHub puede no exponer el email del usuario si está configurado como privado; en ese caso se usa `{login}@github.local` como email de respaldo
+
+### Solución de problemas — GitHub
+
+| Problema | Causa posible | Solución |
+|----------|--------------|----------|
+| "Error: github_auth_failed" | Client ID/Secret incorrectos | Verificar las credenciales en `.env` |
+| "Error: Invalid state parameter" | Sesión expirada o cookies deshabilitadas | Recargar la página e intentar de nuevo |
+| `redirect_uri_mismatch` | La callback URL no coincide exactamente | Verificar que coincida exactamente en GitHub OAuth App y en la configuración |
+| `application_suspended` | La app fue suspendida por GitHub | Ir a GitHub OAuth Apps y verificar el estado de la aplicación |
+| El usuario no aparece en `/publico` | Email privado generó `@github.local` | El usuario puede actualizar su email en la página de perfil |
