@@ -92,6 +92,7 @@ services:
       Authentication__GitHub__ClientId: ${Authentication__GitHub__ClientId:?Debe definir Authentication__GitHub__ClientId en .env}
       Authentication__GitHub__ClientSecret: ${Authentication__GitHub__ClientSecret:?Debe definir Authentication__GitHub__ClientSecret en .env}
       Authentication__GitHub__RedirectUri: ${Authentication__GitHub__RedirectUri:?Debe definir Authentication__GitHub__RedirectUri en .env}
+      Scalar__Enabled: ${Scalar__Enabled:-false}
       FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:?Debe definir FRONTEND_DOMAIN en .env}
     depends_on:
       postgres:

@@ -109,7 +109,7 @@ try
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
-    if (app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Scalar:Enabled"))
     {
         app.MapOpenApi();
         app.MapScalarApiReference("/scalar");
