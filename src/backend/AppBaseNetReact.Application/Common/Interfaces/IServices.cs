@@ -46,3 +46,9 @@ public interface IGoogleAuthService
     string GetAuthorizationUrl(string state);
     Task<GoogleUserInfo> ExchangeCodeAsync(string code, string state, CancellationToken ct = default);
 }
+
+public interface IGitHubAuthService
+{
+    string GetAuthorizationUrl(string state);
+    Task<GitHubUserInfo> ExchangeCodeAsync(string code, string state, CancellationToken ct = default);
+}
