@@ -30,4 +30,4 @@
 
 - [x] 5.1 Run `dotnet build` — 0 errors
 - [x] 5.2 Run `dotnet test` — 394/394 pass (256 Application + 138 WebApi)
-- [ ] 5.3 Verify `/health/live` returns 200, `/health/ready` returns 200 (DB up), or 503 (DB down) — requires running backend with DB
+- [x] 5.3 Verify `/health/live` returns 200 (Healthy, empty entries), `/health/ready` returns 200 (Healthy, DB ~105ms) — verified against https://base-net-react-back.edgardovasquez.cl
