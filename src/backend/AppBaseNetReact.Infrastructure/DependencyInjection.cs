@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.Configure<StorageOptions>(configuration.GetSection("Storage"));
         services.Configure<TurnstileOptions>(configuration.GetSection("Captcha"));
         services.Configure<GoogleOptions>(configuration.GetSection("Authentication:Google"));
+        services.Configure<GitHubOptions>(configuration.GetSection("Authentication:GitHub"));
         var emailOptions = configuration.GetSection("Email").Get<EmailOptions>()
             ?? throw new InvalidOperationException("Email settings not configured");
         if (string.IsNullOrWhiteSpace(emailOptions.FrontendBaseUrl))
@@ -66,6 +67,10 @@ public static class DependencyInjection
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddHttpClient<ICaptchaService, TurnstileService>();
         services.AddHttpClient<IGoogleAuthService, GoogleAuthService>(client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("AppBaseNetReact/1.0");
+        });
+        services.AddHttpClient<IGitHubAuthService, GitHubAuthService>(client =>
         {
             client.DefaultRequestHeaders.UserAgent.ParseAdd("AppBaseNetReact/1.0");
         });
