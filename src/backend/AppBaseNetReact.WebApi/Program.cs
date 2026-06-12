@@ -83,6 +83,15 @@ try
                 PermitLimit = int.Parse(rateLimitConfig["Google:MaxRequests"] ?? "10"),
                 QueueLimit = int.Parse(rateLimitConfig["Google:QueueLimit"] ?? "0")
             }));
+
+        options.AddPolicy("GitHub", ctx => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.Parse(rateLimitConfig["GitHub:Window"] ?? "00:01:00"),
+                PermitLimit = int.Parse(rateLimitConfig["GitHub:MaxRequests"] ?? "10"),
+                QueueLimit = int.Parse(rateLimitConfig["GitHub:QueueLimit"] ?? "0")
+            }));
     });
 
     // Pipeline order (el orden importa):
