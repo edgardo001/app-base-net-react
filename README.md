@@ -200,8 +200,8 @@ curl -s https://api.tudominio.cl/api/users \
 ## Seed Data
 
 Al iniciar por primera vez, el seeder crea:
-- **22 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil
-- **5 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c
+- **23 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil, página pública
+- **6 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c, public
 - **Usuario admin**: `admin` / `admin` (SuperAdmin — se exige cambiar contraseña en primer ingreso)
 
 ## Testing
@@ -305,6 +305,29 @@ Dominios por defecto (configurables en `.env`):
 - Backend: (configurar dominio en producción)
 - Frontend: (configurar dominio en producción)
 
+### Permisos de llave SSH en Windows 11
+
+En Windows, las llaves SSH descargadas heredan permisos por defecto que impiden su uso. Ejecutar en PowerShell:
+
+```powershell
+# 1. Deshabilitar la herencia de permisos y copiar los actuales
+icacls ".\tu-llave-ssh.key" /inheritance:d
+
+# 2. Quitar el acceso a grupos genéricos
+icacls ".\tu-llave-ssh.key" /remove "Users"
+icacls ".\tu-llave-ssh.key" /remove "Authenticated Users"
+icacls ".\tu-llave-ssh.key" /remove "TU-PC\UsuariosGenericos"
+
+# 3. Solo el usuario actual tiene control total
+icacls ".\tu-llave-ssh.key" /grant:r "$($env:USERNAME):(R)"
+```
+
+Conectar:
+
+```bash
+ssh -i ".\tu-llave-ssh.key" ubuntu@IP_DEL_SERVIDOR
+```
+
 ### VPS con 1vCPU / 1GB RAM
 
 Compilar .NET 10 en un VPS de 1GB RAM puede agotar la memoria y ralentizar el build. Se recomienda agregar swap:
@@ -320,12 +343,108 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 Para verificar: `swapon --show` o `free -h`.
 
-## Seed Data
+Para aumentar el swap (ej: de 2GB a 4GB), primero desactivarlo:
 
-Al iniciar por primera vez, el seeder crea:
-- **23 permisos** cubriendo usuarios, roles, permisos, dashboard, admin, perfil, página pública
-- **6 roles**: SuperAdmin, Admin, user-tipo-a, user-tipo-b, user-tipo-c, public
-- **Usuario admin**: `admin` / `admin` (SuperAdmin — se exige cambiar contraseña en primer ingreso)
+```bash
+sudo swapoff /swapfile
+sudo fallocate -l 4G /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+
+> No se puede redimensionar un swapfile montado. Siempre ejecutar `swapoff` antes de `fallocate`.
+
+### Instalar Docker en el servidor
+
+Al entrar por primera vez a la máquina, actualizar los paquetes del sistema:
+
+```bash
+sudo apt update
+```
+
+Luego instalar Docker:
+
+```bash
+# Descargar e instalar Docker usando el script oficial
+curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+sudo sh /tmp/get-docker.sh
+
+# Agregar el usuario actual al grupo docker para no necesitar sudo
+sudo usermod -aG docker $USER
+
+# IMPORTANTE: Cerrar sesión y volver a entrar para que el grupo surta efecto
+exit
+```
+
+Reconectarse:
+
+```bash
+ssh ubuntu@IP_DEL_SERVIDOR
+```
+
+Verificar:
+
+```bash
+docker --version    # Docker version 29.5.2
+docker compose version  # Docker Compose version v2.x.x
+```
+
+> **Si aparece el error `Could not get lock /var/lib/dpkg/lock-frontend`**, significa que otro proceso `apt` está corriendo (probablemente el `sudo apt update` anterior). Ejecuta:
+> ```bash
+> sudo kill -9 <PID>    # el PID que aparece en el mensaje de error (ej: 2384)
+> sleep 5
+> sudo sh /tmp/get-docker.sh
+> ```
+
+### Configurar MTU para Oracle Cloud
+
+Oracle Cloud usa jumbo frames (MTU 9000) en su red interna. Docker por defecto crea redes con MTU 1500, lo que causa fragmentación de paquetes y provoca TLS handshake timeouts al descargar imágenes de Docker Hub.
+
+Solución: Configurar Docker para usar MTU 1450 y DNS públicos:
+
+```bash
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json > /dev/null << 'EOF'
+{
+  "dns": ["1.1.1.1", "8.8.8.8"],
+  "mtu": 1450
+}
+EOF
+sudo systemctl restart docker
+```
+
+> Sin este ajuste, los `docker pull` fallan con timeout. Es uno de los errores más comunes en Oracle Cloud.
+
+> **Si aparece `permission denied while trying to connect to the docker API`**, el usuario actual no tiene permisos de docker. Ejecutar:
+> ```bash
+> sudo usermod -aG docker $USER
+> ```
+> Luego **cerrar sesión y volver a conectarse** para que el grupo surta efecto.
+
+### Firewall del Sistema Operativo (iptables)
+
+Las imágenes de Ubuntu en Oracle Cloud vienen con reglas de iptables preconfiguradas que bloquean tráfico entrante. Desactivar `ufw` NO es suficiente porque las reglas están gestionadas por `netfilter-persistent`.
+
+Ejecutar estos comandos por SSH:
+
+```bash
+# Abrir puerto 80 (HTTP) — se inserta en la primera posición de la cadena INPUT
+sudo iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
+
+# Abrir puerto 443 (HTTPS) — misma lógica, primera posición
+sudo iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
+
+# Guardar las reglas de forma permanente para que sobrevivan reinicios
+sudo netfilter-persistent save
+```
+
+Verificación:
+
+```bash
+sudo iptables -L INPUT -n --line-numbers
+```
+
+Deberías ver las reglas ACCEPT para los puertos 80 y 443 en las primeras posiciones de la cadena INPUT.
 
 ## Google OAuth 2.0 — Configuración
 
