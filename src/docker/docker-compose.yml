@@ -144,8 +144,32 @@ services:
         limits:
           memory: 100M
 
+  # --- Backup automático de PostgreSQL ---
+  pg-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    container_name: mvp-pg-backup
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-mvp-usuarios-db}
+      POSTGRES_USER: ${POSTGRES_USER:-mvp-usuarios-db}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: 30
+      SCHEDULE: "@daily"
+    volumes:
+      - pg_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mvp-network
+    restart: unless-stopped
+    profiles:
+      - backup
+
 volumes:
   postgres-data:
+  pg_backups:
   # traefik-letsencrypt:  # ya no se necesita al usar Traefik externo
 
 networks:
